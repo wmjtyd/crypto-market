@@ -148,7 +148,7 @@ fn create_nanomsg_writer_thread(
                         nanomsg_writer.write(s.as_bytes());
                     }
                     MessageType::L2Event => {
-                        let orderbook = tokio::task::spawn_blocking(|| parse_l2("binance", MarketType::Spot, &(msg as Message).json, None).unwrap()).await.unwrap();
+                        let orderbook = tokio::task::spawn_blocking(|| parse_l2(exchange, MarketType::Spot, &(msg as Message).json, None).unwrap()).await.unwrap();
                         let orderbook = &orderbook[0];
                         // encode
                         nanomsg_writer.write(s.as_bytes());
