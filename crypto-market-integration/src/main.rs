@@ -11,6 +11,7 @@ pub async fn crawl(
     msg_type: MessageType,
     data_dir: Option<String>,
     redis_url: Option<String>,
+    data_deal_type: &str,
     symbols: Option<&[String]>,
 ) {
     if data_dir.is_none() && redis_url.is_none() {
@@ -18,7 +19,8 @@ pub async fn crawl(
         return;
     }
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
-    let writer_threads = create_writer_threads(rx, data_dir, redis_url);
+    let writer_threads = 
+    create_writer_threads(rx, data_dir, redis_url, data_deal_type, exchange, market_type, msg_type);
 
     if msg_type == MessageType::Candlestick {
         crawl_candlestick(exchange, market_type, None, tx).await;
@@ -85,7 +87,7 @@ async fn main() {
 
     let args: Vec<String> = env::args().collect();
     if args.len() != 4 && args.len() != 5 {
-        println!("Usage: carbonbot <exchange> <market_type> <msg_type> [comma_seperated_symbols]");
+        println!("Usage: carbonbot <exchange> <market_type> <msg_type> <data_deal_type> [comma_seperated_symbols]");
         return;
     }
 
@@ -107,6 +109,8 @@ async fn main() {
     }
     let msg_type = msg_type.unwrap();
 
+    let data_deal_type = args[4].as_str();
+
     let data_dir = if std::env::var("DATA_DIR").is_err() {
         info!("The DATA_DIR environment variable does not exist");
         None
@@ -123,18 +127,18 @@ async fn main() {
         Some(url)
     };
 
-    let specified_symbols = if args.len() == 4 {
+    let specified_symbols = if args.len() == 5 {
         Vec::new()
     } else {
         let mut symbols = fetch_symbols_retry(exchange, market_type);
-        symbols.retain(|symbol| args[4].split(',').any(|part| symbol.contains(part)));
+        symbols.retain(|symbol| args[5].split(',').any(|part| symbol.contains(part)));
         info!("target symbols: {:?}", symbols);
         symbols
     };
 
-    if data_dir.is_none() && redis_url.is_none() {
-        panic!("The environment variable DATA_DIR and REDIS_URL are not set, at least one of them should be set");
-    }
+    // if data_dir.is_none() && redis_url.is_none() {
+    //     panic!("The environment variable DATA_DIR and REDIS_URL are not set, at least one of them should be set");
+    // }
 
     let pid = std::process::id();
     // write pid to file
@@ -152,6 +156,7 @@ async fn main() {
         msg_type,
         data_dir,
         redis_url,
+        data_deal_type,
         if specified_symbols.is_empty() {
             None
         } else {
