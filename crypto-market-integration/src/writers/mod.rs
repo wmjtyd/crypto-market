@@ -1,7 +1,7 @@
 pub(super) mod file_writer;
 
 use crypto_crawler::*;
-use crypto_msg_parser::{parse_l2, parse_trade, parse_bbo, OrderBookMsg, parse_l2_topk};
+use crypto_msg_parser::{parse_l2, parse_trade, parse_bbo, OrderBookMsg, parse_l2_topk, Order, TradeMsg, TradeSide};
 use log::*;
 use redis::{self, Commands};
 use std::{
@@ -158,7 +158,7 @@ fn create_nanomsg_writer_thread(
                         let orderbook = tokio::task::spawn_blocking(move || parse_l2_topk(exchange, MarketType::Spot, &(msg as Message).json, Some(received_at)).unwrap()).await.unwrap();
                         let orderbook = &orderbook[0];
                         // encode
-                        let order_book_bytes = encode_orderbook(*orderbook); 
+                        let order_book_bytes = encode_orderbook(orderbook); 
                         // send
                         nanomsg_writer.write(&order_book_bytes);
                     }
@@ -292,7 +292,7 @@ fn encode_num_to_bytes(mut value: String) -> [u8;5] {
     result
 }
 
-pub fn encode_orderbook(orderbook: OrderBookMsg) -> Vec<u8> {
+pub fn encode_orderbook(orderbook: &OrderBookMsg) -> Vec<u8> {
     let mut orderbook_bytes: Vec<u8> = Vec::new();
 
     let exchange_timestamp = orderbook.timestamp;
@@ -352,8 +352,8 @@ pub fn encode_orderbook(orderbook: OrderBookMsg) -> Vec<u8> {
 
     //7、ask、bid
     let mut markets = HashMap::new();
-    markets.insert("asks", orderbook.asks);
-    markets.insert("bids", orderbook.bids);
+    markets.insert("asks", &orderbook.asks);
+    markets.insert("bids", &orderbook.bids);
     
     for (k, order_list) in markets {
 
@@ -386,5 +386,371 @@ pub fn encode_orderbook(orderbook: OrderBookMsg) -> Vec<u8> {
     // let compressed = compress_to_vec(&bytes, 6);
     // println!("compressed from {} to {}", data.len(), compressed.len());
     orderbook_bytes
+}
 
+
+fn decode_orderbook(payload: Vec<u8>) -> OrderBookMsg {
+
+    let mut data_byte_index = 0;
+
+    //1、交易所时间戳:6 or 8 字节时间戳 
+    let mut exchange_timestamp_array: [u8; 16] = [0; 16];
+    exchange_timestamp_array[10..].copy_from_slice(&payload[0..6]);
+    let exchange_timestamp = u128::from_be_bytes(exchange_timestamp_array);
+    data_byte_index += 6;
+
+    //2、收到时间戳:6 or 8 字节时间戳
+    let mut received_timestamp_array: [u8; 16] = [0; 16];
+    received_timestamp_array[10..].copy_from_slice(&payload[0..6]);
+    let received_timestamp = u128::from_be_bytes(received_timestamp_array);
+    data_byte_index += 6;
+
+    //3、EXANGE 1字节信息标识
+    let exchange = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let exchange_name = match exchange.unwrap() {
+        1 => "CRYPTO",
+        2 => "FTX",
+        3 => "BINANCE",
+        _=>"UNKNOWN",
+    };
+
+    //4、MARKET_TYPE 1字节信息标识
+    let market_type = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let market_type_name = match market_type.unwrap() {
+        1 => MarketType::Spot,
+        2 => MarketType::LinearFuture,
+        3 => MarketType::InverseFuture,
+        4 => MarketType::LinearSwap,
+        5 => MarketType::InverseSwap,
+        6 => MarketType::EuropeanOption,
+        7 => MarketType::AmericanOption,
+        _=>MarketType::Unknown,
+    };
+
+    //5、MESSAGE_TYPE 1字节信息标识
+    let message_type = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let message_type_name = match message_type.unwrap() {
+        1 => MessageType::Trade,
+        2 => MessageType::BBO,
+        3 => MessageType::L2TopK,
+        4 => MessageType::L2Snapshot,
+        5 => MessageType::L2Event,
+        6 => MessageType::L3Snapshot,
+        7 => MessageType::L3Event,
+        8 => MessageType::Ticker,
+        9 => MessageType::Candlestick,
+        10 => MessageType::OpenInterest,
+        11 => MessageType::FundingRate,
+        12 => MessageType::Other,
+        _=>MessageType::Other,
+    };
+
+    //6、SYMBLE 2字节信息标识
+    let symbol_bytes = &payload[data_byte_index..data_byte_index + 2];
+    data_byte_index += 2;
+    let mut symbol_bytes_dst = [0u8; 2];
+    symbol_bytes_dst.clone_from_slice(symbol_bytes);
+    let symbol = u16::from_be_bytes(symbol_bytes_dst);
+    let pair = match symbol {
+        1 => "BTC/USDT",
+        2 => "BTC/USD",
+        3 => "USDT/USD",
+        _=>"UNKNOWN",
+    };
+
+    //7、ask、bid
+    let mut asks: Vec<Order> = Vec::new();
+    let mut bids: Vec<Order> = Vec::new();
+    while data_byte_index < payload.len() {
+
+        //1）字节信息标识
+        let data_type_flag = payload.get(data_byte_index);
+        data_byte_index += 1;
+
+        //2）字节信息体的长度
+        let info_bytes_len = &payload[data_byte_index..data_byte_index + 2];
+        data_byte_index += 2;
+        let mut info_bytes_dst = [0u8; 2];
+        info_bytes_dst.clone_from_slice(info_bytes_len);
+        let mut info_len = u16::from_be_bytes(info_bytes_dst);
+        info_len /= 8;
+
+        let mut i = 0;
+        while i < info_len {
+
+            // price
+            let mut price_array: [u8; 8] = [0; 8];
+            price_array[5..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+            let price_int = i64::from_be_bytes(price_array);
+
+            let price_hex_p = payload[data_byte_index + 4];
+            let price_hex_p_array = [price_hex_p];
+            let mut price_p_array: [u8; 4] = [0; 4];
+            price_p_array[3] = price_hex_p_array[0];
+            let price_p_int = u32::from_be_bytes(price_p_array);
+
+            let price = Decimal::new(price_int, price_p_int);
+            let pricef = price.to_f64();
+
+            // quant
+            let mut quant_array = [0u8; 8];
+            quant_array[5..]
+                .copy_from_slice(&payload[data_byte_index + 5..data_byte_index + 5 + 4]);
+            let quant_int = i64::from_be_bytes(quant_array);
+
+            let quant_hex_p = payload[data_byte_index + 5 + 4];
+            let quant_hex_p_array = [quant_hex_p];
+            let mut quant_p_array = [0u8; 4];
+            quant_p_array[3] = quant_hex_p_array[0];
+            let quant_p_int = u32::from_be_bytes(quant_p_array);
+
+            let quant = Decimal::new(quant_int, quant_p_int);
+            let quantf = quant.to_f64();
+
+            let order = Order{
+                price: pricef.unwrap(),
+                quantity_base: quantf.unwrap(),
+                quantity_quote: 0.0,
+                quantity_contract: None,
+            };
+            
+            let data_type_flag_u8 = data_type_flag.unwrap().to_be();
+            if (1 == data_type_flag_u8) { // ask
+                asks.push(order);
+            } else if (2 == data_type_flag_u8) { // bid
+                bids.push(order);
+            }
+
+            i += 1;
+            data_byte_index += 10
+        }
+    }
+    
+    let orderbook = OrderBookMsg {
+        exchange: exchange_name.to_string(),
+        market_type: market_type_name,
+        symbol: pair.to_string(),
+        pair: pair.to_string(),
+        msg_type: message_type_name,
+        timestamp: exchange_timestamp as i64,
+        seq_id: None,
+        prev_seq_id: None,
+        asks: asks,
+        bids: bids,
+        snapshot: true,
+        json: "".to_string(),
+    };
+
+    orderbook
+}
+
+
+pub fn encode_trade(orderbook: &TradeMsg) -> Vec<u8> {
+    let mut orderbook_bytes: Vec<u8> = Vec::new();
+
+    let exchange_timestamp = orderbook.timestamp;
+
+    //1、交易所时间戳:6 or 8 字节时间戳 
+    let exchange_timestamp_hex = long_to_hex(exchange_timestamp);
+    let exchange_timestamp_hex_byte = hex_to_byte(exchange_timestamp_hex);
+    orderbook_bytes.extend_from_slice(&exchange_timestamp_hex_byte);
+
+    //2、收到时间戳:6 or 8 字节时间戳 
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("get millis error");
+    let now_ms = now.as_millis();
+    let received_timestamp_hex = long_to_hex(now_ms as i64);
+    let received_timestamp_hex_byte = hex_to_byte(received_timestamp_hex);
+    orderbook_bytes.extend_from_slice(&received_timestamp_hex_byte);
+
+    //3、EXANGE 1字节信息标识
+    let _exchange = EXANGE.get(&orderbook.exchange.as_str()).unwrap();
+    orderbook_bytes.push(*_exchange);
+
+    //4、MARKET_TYPE 1字节信息标识
+    let _market_type = match orderbook.market_type {
+        Spot => 1,
+        LinearFuture => 2,
+        InverseFuture => 3,
+        LinearSwap => 4,
+        InverseSwap => 5,
+        EuropeanOption => 6,
+    };
+    orderbook_bytes.push(_market_type);
+
+    //5、MESSAGE_TYPE 1字节信息标识
+    let _message_type = match orderbook.msg_type {
+        Trade => 1,
+        BBO => 2,
+        L2TopK => 3,
+        L2Snapshot => 4,
+        L2Event => 5,
+        L3Snapshot => 6,
+        L3Event => 7,
+        Ticker => 8,
+        Candlestick => 9,
+        OpenInterest => 10,
+        FundingRate => 11,
+        Other => 12,
+    };
+    orderbook_bytes.push(_message_type);
+
+    //6、SYMBLE 2字节信息标识
+    let _pair = SYMBLE.get(&orderbook.pair.as_str()).unwrap();
+    let _pair_hex = long_to_hex(*_pair as i64);
+    if(_pair_hex.len() < 4) {
+        let _pair_hex = format!("{:0>4}", _pair_hex);
+    }
+    let _pair_hex_byte = hex_to_byte(_pair_hex);
+    orderbook_bytes.extend_from_slice(&_pair_hex_byte);
+
+    //7、TradeSide 1字节信息标识
+    let _side = match orderbook.side {
+        Buy => 1,
+        Sell => 2,
+    };    
+    orderbook_bytes.push(_side);
+
+    //3）data(price(5)、quant(5))
+    let price = orderbook.price;
+    let quantity_base = orderbook.quantity_base;
+    let price_bytes = encode_num_to_bytes(price.to_string());
+    let quantity_base_bytes = encode_num_to_bytes(quantity_base.to_string());
+    orderbook_bytes.extend_from_slice(&price_bytes);
+    orderbook_bytes.extend_from_slice(&quantity_base_bytes);
+
+    orderbook_bytes
+
+}
+
+
+fn decode_trade(payload: Vec<u8>) -> TradeMsg {
+
+    let mut data_byte_index = 0;
+
+    //1、交易所时间戳:6 or 8 字节时间戳 
+    let mut exchange_timestamp_array: [u8; 16] = [0; 16];
+    exchange_timestamp_array[10..].copy_from_slice(&payload[0..6]);
+    let exchange_timestamp = u128::from_be_bytes(exchange_timestamp_array);
+    data_byte_index += 6;
+
+    //2、收到时间戳:6 or 8 字节时间戳
+    let mut received_timestamp_array: [u8; 16] = [0; 16];
+    received_timestamp_array[10..].copy_from_slice(&payload[0..6]);
+    let received_timestamp = u128::from_be_bytes(received_timestamp_array);
+    data_byte_index += 6;
+
+    //3、EXANGE 1字节信息标识
+    let exchange = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let exchange_name = match exchange.unwrap() {
+        1 => "CRYPTO",
+        2 => "FTX",
+        3 => "BINANCE",
+        _=>"UNKNOWN",
+    };
+
+    //4、MARKET_TYPE 1字节信息标识
+    let market_type = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let market_type_name = match market_type.unwrap() {
+        1 => MarketType::Spot,
+        2 => MarketType::LinearFuture,
+        3 => MarketType::InverseFuture,
+        4 => MarketType::LinearSwap,
+        5 => MarketType::InverseSwap,
+        6 => MarketType::EuropeanOption,
+        7 => MarketType::AmericanOption,
+        _=>MarketType::Unknown,
+    };
+
+    //5、MESSAGE_TYPE 1字节信息标识
+    let message_type = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let message_type_name = match message_type.unwrap() {
+        1 => MessageType::Trade,
+        2 => MessageType::BBO,
+        3 => MessageType::L2TopK,
+        4 => MessageType::L2Snapshot,
+        5 => MessageType::L2Event,
+        6 => MessageType::L3Snapshot,
+        7 => MessageType::L3Event,
+        8 => MessageType::Ticker,
+        9 => MessageType::Candlestick,
+        10 => MessageType::OpenInterest,
+        11 => MessageType::FundingRate,
+        12 => MessageType::Other,
+        _=>MessageType::Other,
+    };
+
+    //6、SYMBLE 2字节信息标识
+    let symbol_bytes = &payload[data_byte_index..data_byte_index + 2];
+    data_byte_index += 2;
+    let mut symbol_bytes_dst = [0u8; 2];
+    symbol_bytes_dst.clone_from_slice(symbol_bytes);
+    let symbol = u16::from_be_bytes(symbol_bytes_dst);
+    let pair = match symbol {
+        1 => "BTC/USDT",
+        2 => "BTC/USD",
+        3 => "USDT/USD",
+        _=>"UNKNOWN",
+    };
+
+    //7、TradeSide 1字节信息标识
+    let trade_side_type = payload.get(data_byte_index);
+    data_byte_index += 1;
+    let trade_side = match trade_side_type.unwrap() {
+        1 => TradeSide::Buy,
+        2 => TradeSide::Sell,
+        _=>  TradeSide::Sell,
+    };
+
+    // price
+    let mut price_array: [u8; 8] = [0; 8];
+    price_array[5..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    let price_int = i64::from_be_bytes(price_array);
+
+    let price_hex_p = payload[data_byte_index + 4];
+    let price_hex_p_array = [price_hex_p];
+    let mut price_p_array: [u8; 4] = [0; 4];
+    price_p_array[3] = price_hex_p_array[0];
+    let price_p_int = u32::from_be_bytes(price_p_array);
+
+    let price = Decimal::new(price_int, price_p_int);
+    let pricef = price.to_f64();
+
+    // quant
+    let mut quant_array = [0u8; 8];
+    quant_array[5..]
+        .copy_from_slice(&payload[data_byte_index + 5..data_byte_index + 5 + 4]);
+    let quant_int = i64::from_be_bytes(quant_array);
+
+    let quant_hex_p = payload[data_byte_index + 5 + 4];
+    let quant_hex_p_array = [quant_hex_p];
+    let mut quant_p_array = [0u8; 4];
+    quant_p_array[3] = quant_hex_p_array[0];
+    let quant_p_int = u32::from_be_bytes(quant_p_array);
+
+    let quant = Decimal::new(quant_int, quant_p_int);
+    let quantf = quant.to_f64();
+
+    let orderbook = TradeMsg {
+        exchange: exchange_name.to_string(),
+        market_type: market_type_name,
+        msg_type: message_type_name,
+        pair: pair.to_string(),
+        symbol: pair.to_string(),
+        timestamp: exchange_timestamp as i64,
+        side: trade_side,
+        price: pricef.unwrap(),
+        quantity_base: quantf.unwrap(),
+        quantity_quote: 0.0,
+        quantity_contract: None,
+        trade_id: "".to_string(),
+        json: "".to_string(),
+    };
+
+    orderbook
 }

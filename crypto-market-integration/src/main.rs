@@ -19,9 +19,9 @@ lazy_static! {
 
     static ref SYMBLE: HashMap<&'static str, u8> = {
         let mut m = HashMap::new();
-        m.insert("BTCUSDT", 1);
-        m.insert("BTCUSD", 2);
-        m.insert("USDTUSD", 3);
+        m.insert("BTC/USDT", 1);
+        m.insert("BTC/USD", 2);
+        m.insert("USDT/USD", 3);
         m
     };
 

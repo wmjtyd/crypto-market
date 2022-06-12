@@ -27,6 +27,9 @@ slack-hook = "0.8.0"
 openssl = { version = "0.10", features = ["vendored"] }
 nanomsg = "0.7.2"
 
+rust_decimal = "1.23.1"
+rust_decimal_macros = "1.23.1"
+
 [profile.release]
 lto = true
 strip = "debuginfo"
