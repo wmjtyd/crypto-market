@@ -5,34 +5,6 @@ use crypto_msg_type::MessageType;
 use log::*;
 use std::{env, str::FromStr};
 
-#[macro_use]
-extern crate lazy_static;
-
-lazy_static! {
-
-    static ref EXANGE: HashMap<&'static str, u8> = {
-        let mut m = HashMap::new();
-        m.insert("FTX", 2);
-        m.insert("BINANCE", 3);
-        m
-    };
-
-    static ref SYMBLE: HashMap<&'static str, u8> = {
-        let mut m = HashMap::new();
-        m.insert("BTC/USDT", 1);
-        m.insert("BTC/USD", 2);
-        m.insert("USDT/USD", 3);
-        m
-    };
-
-    static ref INFOTYPE: HashMap<&'static str, u8> = {
-        let mut m = HashMap::new();
-        m.insert("asks", 1);
-        m.insert("bids", 2);
-        m
-    };
-}
-
 pub async fn crawl(
     exchange: &'static str,
     market_type: MarketType,
