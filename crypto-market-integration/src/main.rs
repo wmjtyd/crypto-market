@@ -88,10 +88,19 @@ pub async fn crawl(
         };
     }
 
-    let writer_threads =
-        create_writer_threads(arc_rx, data_dir, redis_url, data_deal_type, exchange, market_type, msg_type);
+    let writer_threads = create_writer_threads(
+        arc_rx,
+        data_dir,
+        redis_url,
+        data_deal_type,
+        exchange,
+        market_type,
+        msg_type,
+    );
     futures::future::join_all(writer_threads.into_iter()).await;
-    message_convert_task.await.expect("failed to run the convert task");
+    message_convert_task
+        .await
+        .expect("failed to run the convert task");
 }
 
 #[tokio::main(flavor = "multi_thread")]
