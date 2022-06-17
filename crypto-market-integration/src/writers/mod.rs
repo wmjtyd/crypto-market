@@ -9,7 +9,7 @@ use rust_decimal::{Decimal, prelude::ToPrimitive};
 use std::{
     collections::HashMap,
     path::Path,
-    sync::mpsc::{Receiver, Sender},
+    sync::{mpsc::{Receiver, Sender}, Arc},
     thread::JoinHandle, time::SystemTime
 };
 use nanomsg::{Protocol, Socket};
@@ -25,7 +25,7 @@ pub use file_writer::FileWriter;
 use crate::data::{EXANGE, SYMBLE, INFOTYPE};
 
 async fn create_file_writer_thread(
-    rx: Receiver<Message>,
+    rx: Receiver<Arc<Message>>,
     data_dir: String,
 ) {
     tokio::task::spawn(async move {
@@ -48,7 +48,7 @@ async fn create_file_writer_thread(
                 );
             }
 
-            let s = serde_json::to_string(&msg).unwrap();
+            let s = serde_json::to_string(msg.as_ref()).unwrap();
 
             if let Some(writer) = writers.get_mut(&file_name) {
                 writer.write(&s);
@@ -89,12 +89,12 @@ fn connect_redis(redis_url: &str) -> Result<redis::Connection, redis::RedisError
     }
 }
 
-fn create_redis_writer_thread(rx: Receiver<Message>, redis_url: String) -> JoinHandle<()> {
+fn create_redis_writer_thread(rx: Receiver<Arc<Message>>, redis_url: String) -> JoinHandle<()> {
     std::thread::spawn(move || {
         let mut redis_conn = connect_redis(&redis_url).unwrap();
         for msg in rx {
             let msg_type = msg.msg_type;
-            let s = serde_json::to_string(&msg).unwrap();
+            let s = serde_json::to_string(msg.as_ref()).unwrap();
             let topic = format!("carbonbot:{}", msg_type);
             if let Err(err) = redis_conn.publish::<&str, String, i64>(&topic, s) {
                 error!("{}", err);
@@ -106,8 +106,8 @@ fn create_redis_writer_thread(rx: Receiver<Message>, redis_url: String) -> JoinH
 
 
 async fn create_nanomsg_writer_thread(
-    rx: Receiver<Message>,
-    tx_redis: Option<Sender<Message>>,
+    rx: Receiver<Arc<Message>>,
+    tx_redis: Option<Sender<Arc<Message>>>,
     exchange: &'static str,
     market_type: MarketType,
     msg_type: MessageType,
@@ -135,31 +135,32 @@ async fn create_nanomsg_writer_thread(
                 );
             }
 
-            let s = serde_json::to_string(&msg).unwrap();
+            let s = serde_json::to_string(msg.as_ref()).unwrap();
 
             if let Some(nanomsg_writer) = writers.get_mut(&file_name) {
+                let msg = msg.clone();
                 match msg_type {
                     MessageType::BBO => {
                         let received_at = 1651122265862;
-                        let bbo_msg = tokio::task::spawn_blocking(|| parse_bbo(exchange, MarketType::Spot, &(msg as Message).json, Some(received_at)).unwrap()).await.unwrap();
+                        let bbo_msg = tokio::task::spawn_blocking(move || parse_bbo(exchange, MarketType::Spot, &msg.json, Some(received_at)).unwrap()).await.unwrap();
                         // encode
                         nanomsg_writer.write(s.as_bytes());
                     }
                     MessageType::Trade => {
-                        let trade = tokio::task::spawn_blocking(|| parse_trade(exchange, MarketType::Spot, &(msg as Message).json).unwrap()).await.unwrap();
+                        let trade = tokio::task::spawn_blocking(move || parse_trade(exchange, MarketType::Spot, &msg.json).unwrap()).await.unwrap();
                         let trade = &trade[0];
                         // encode
                         nanomsg_writer.write(s.as_bytes());
                     }
                     MessageType::L2Event => {
-                        let orderbook = tokio::task::spawn_blocking(|| parse_l2(exchange, MarketType::Spot, &(msg as Message).json, None).unwrap()).await.unwrap();
+                        let orderbook = tokio::task::spawn_blocking(move || parse_l2(exchange, MarketType::Spot, &msg.json, None).unwrap()).await.unwrap();
                         let orderbook = &orderbook[0];
                         // encode
                         nanomsg_writer.write(s.as_bytes());
                     }
                     MessageType::L2TopK => {
                         let received_at = msg.received_at as i64;
-                        let orderbook = tokio::task::spawn_blocking(move || parse_l2_topk(exchange, MarketType::Spot, &(msg as Message).json, Some(received_at)).unwrap()).await.unwrap();
+                        let orderbook = tokio::task::spawn_blocking(move || parse_l2_topk(exchange, MarketType::Spot, &msg.json, Some(received_at)).unwrap()).await.unwrap();
                         let orderbook = &orderbook[0];
                         // encode
                         let order_book_bytes = encode_orderbook(orderbook); 
@@ -179,7 +180,7 @@ async fn create_nanomsg_writer_thread(
 }
 
 pub fn create_writer_threads(
-    rx: Receiver<Message>,
+    rx: Receiver<Arc<Message>>,
     data_dir: Option<String>,
     redis_url: Option<String>,
     data_deal_type: &str,
@@ -211,7 +212,7 @@ pub fn create_writer_threads(
 
     if data_deal_type == "1" { // write file and nanomsg
         // channel for nanomsg
-        let (tx_redis, rx_redis) = std::sync::mpsc::channel::<Message>();
+        let (tx_redis, rx_redis) = std::sync::mpsc::channel::<Arc<Message>>();
         threads.push(create_nanomsg_writer_thread(rx, Some(tx_redis), exchange, market_type, msg_type).boxed());
         threads.push(create_file_writer_thread(rx_redis, data_dir.unwrap()).boxed());
     } else if data_deal_type == "2" { // nanomsg
