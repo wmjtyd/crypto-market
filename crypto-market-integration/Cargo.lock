@@ -175,6 +175,7 @@ dependencies = [
  "crypto-rest-client",
  "crypto-ws-client",
  "env_logger",
+ "futures 0.3.21",
  "lazy_static",
  "log",
  "nanomsg",

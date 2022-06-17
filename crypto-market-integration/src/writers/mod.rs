@@ -2,16 +2,18 @@ pub(super) mod file_writer;
 
 use crypto_crawler::*;
 use crypto_msg_parser::{parse_l2, parse_trade, parse_bbo, OrderBookMsg, parse_l2_topk, Order, TradeMsg, TradeSide};
+use futures::{FutureExt, future::BoxFuture};
 use log::*;
 use redis::{self, Commands};
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 use std::{
     collections::HashMap,
     path::Path,
     sync::mpsc::{Receiver, Sender},
-    thread::JoinHandle, time::SystemTime,
+    thread::JoinHandle, time::SystemTime
 };
 use nanomsg::{Protocol, Socket};
-use std::io::{Read, Write};
+use std::io::Write;
 
 pub trait Writer {
     fn write(&mut self, s: &str);
@@ -20,11 +22,13 @@ pub trait Writer {
 
 pub use file_writer::FileWriter;
 
-fn create_file_writer_thread(
+use crate::data::{EXANGE, SYMBLE, INFOTYPE};
+
+async fn create_file_writer_thread(
     rx: Receiver<Message>,
     data_dir: String,
-) -> JoinHandle<()> {
-    std::thread::spawn(move || {
+) {
+    tokio::task::spawn(async move {
         let mut writers: HashMap<String, FileWriter> = HashMap::new();
         for msg in rx {
             let file_name = format!("{}.{}.{}", msg.exchange, msg.market_type, msg.msg_type);
@@ -57,7 +61,7 @@ fn create_file_writer_thread(
         for mut writer in writers {
             writer.1.close();
         }
-    })
+    }).await.expect("create_file_writer_thread failed");
 }
 
 fn connect_redis(redis_url: &str) -> Result<redis::Connection, redis::RedisError> {
@@ -101,14 +105,14 @@ fn create_redis_writer_thread(rx: Receiver<Message>, redis_url: String) -> JoinH
 }
 
 
-fn create_nanomsg_writer_thread(
+async fn create_nanomsg_writer_thread(
     rx: Receiver<Message>,
     tx_redis: Option<Sender<Message>>,
     exchange: &'static str,
     market_type: MarketType,
     msg_type: MessageType,
-) -> JoinHandle<()> {
-    std::thread::spawn(move || {
+) {
+    tokio::task::spawn(async move {
         let mut writers: HashMap<String, Socket> = HashMap::new();
         for msg in rx {
             let file_name = format!("{}.{}.{}", msg.exchange, msg.market_type, msg.msg_type);
@@ -171,10 +175,9 @@ fn create_nanomsg_writer_thread(
                 tx_redis.send(msg).unwrap();
             }
         }
-    })
+    }).await.expect("create_nanomsg_writer_thread failed");
 }
 
-#[allow(clippy::unnecessary_unwrap)]
 pub fn create_writer_threads(
     rx: Receiver<Message>,
     data_dir: Option<String>,
@@ -183,8 +186,9 @@ pub fn create_writer_threads(
     exchange: &'static str,
     market_type: MarketType,
     msg_type: MessageType,
-) -> Vec<JoinHandle<()>> {
+) -> Vec<BoxFuture<'static, ()>> {
     let mut threads = Vec::new();
+
     if data_dir.is_none() && redis_url.is_none() {
         error!("Both DATA_DIR and REDIS_URL are not set");
         return threads;
@@ -208,12 +212,12 @@ pub fn create_writer_threads(
     if data_deal_type == "1" { // write file and nanomsg
         // channel for nanomsg
         let (tx_redis, rx_redis) = std::sync::mpsc::channel::<Message>();
-        threads.push(create_nanomsg_writer_thread(rx, Some(tx_redis), exchange, market_type, msg_type));
-        threads.push(create_file_writer_thread(rx_redis, data_dir.unwrap()));
+        threads.push(create_nanomsg_writer_thread(rx, Some(tx_redis), exchange, market_type, msg_type).boxed());
+        threads.push(create_file_writer_thread(rx_redis, data_dir.unwrap()).boxed());
     } else if data_deal_type == "2" { // nanomsg
-        threads.push(create_nanomsg_writer_thread(rx, None, exchange, market_type, msg_type))
+        threads.push(create_nanomsg_writer_thread(rx, None, exchange, market_type, msg_type).boxed())
     } else if data_deal_type == "3" { // file
-        threads.push(create_file_writer_thread(rx, data_dir.unwrap()))
+        threads.push(create_file_writer_thread(rx, data_dir.unwrap()).boxed())
     }
 
     threads
