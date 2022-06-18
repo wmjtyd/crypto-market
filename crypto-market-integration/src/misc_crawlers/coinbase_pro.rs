@@ -1,4 +1,4 @@
-use std::sync::mpsc::Sender;
+use std::sync::{mpsc::Sender, Arc};
 
 use super::utils::create_conversion_thread;
 use crypto_crawler::Message;
@@ -6,7 +6,7 @@ use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use crypto_ws_client::*;
 
-pub(super) async fn crawl_other(market_type: MarketType, tx: Sender<Message>) {
+pub(super) async fn crawl_other(market_type: MarketType, tx: Sender<Arc<Message>>) {
     let tx = create_conversion_thread(
         "coinbase_pro".to_string(),
         MessageType::Other,

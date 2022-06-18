@@ -29,6 +29,8 @@ nanomsg = "0.7.2"
 
 rust_decimal = "1.23.1"
 rust_decimal_macros = "1.23.1"
+phf = { version = "0.10.1", features = ["macros"] }
+futures = "0.3.21"
 
 [profile.release]
 lto = true
