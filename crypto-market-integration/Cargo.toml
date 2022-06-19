@@ -26,6 +26,7 @@ lazy_static = "1.4.0"
 slack-hook = "0.8.0"
 openssl = { version = "0.10", features = ["vendored"] }
 nanomsg = "0.7.2"
+chrono = "0.4.19"
 
 rust_decimal = "1.23.1"
 rust_decimal_macros = "1.23.1"
