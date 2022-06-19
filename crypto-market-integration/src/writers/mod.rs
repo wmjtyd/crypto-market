@@ -184,7 +184,8 @@ async fn create_nanomsg_writer_thread(
                         // encode
                         let order_book_bytes = encode_orderbook(orderbook);
                         // send
-                        nanomsg_writer.write(&order_book_bytes);
+                        let order_book_bytes_u8 = unsafe{std::mem::transmute::<&[i8], &[u8]>(&order_book_bytes)};
+                        nanomsg_writer.write(order_book_bytes_u8);
                     }
                     _ => panic!("Not implemented"),
                 };
