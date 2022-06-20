@@ -26,8 +26,8 @@ pub static INFOTYPE: phf::Map<&'static str, u8> = phf_map! {
 pub fn long_to_hex(num: i64) -> String {
     let num_hex = format!("{:x}", num); // to hex
     let mut num_hex_len = num_hex.len() / 2;
-    if (num_hex_len * 2 < num_hex.len()) {
-        num_hex_len = (num_hex_len + 1);
+    if num_hex_len * 2 < num_hex.len() {
+        num_hex_len = num_hex_len + 1;
     }
     let pad_len = num_hex_len * 2;
     let long_hex = format!("{0:0>pad_len$}", num_hex, pad_len = pad_len);
@@ -63,7 +63,7 @@ fn hex_to_byte(mut hex: String) -> Vec<i8> {
 
 fn encode_num_to_bytes(mut value: String) -> [i8; 5] {
     let mut result: [i8; 5] = [0; 5];
-    let mut e = 0;
+    let e = 0;
 
     // if value.find("E-") != Some(0) {
     //     let split: Vec<&str> = value.split("E-").collect();
@@ -548,7 +548,7 @@ fn decode_orderbook(payload: Vec<i8>) -> OrderBookMsg {
             };
 
             let data_type_flag_u8 = data_type_flag.unwrap().to_be();
-            if (1 == data_type_flag_u8) {
+            if 1 == data_type_flag_u8 {
                 // ask
                 asks.push(order);
             } else if (2 == data_type_flag_u8) {

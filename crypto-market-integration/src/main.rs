@@ -3,7 +3,7 @@ use crypto_crawler::*;
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use log::*;
-use std::{env, str::FromStr, sync::Arc};
+use std::str::FromStr;
 
 pub async fn crawl(
     exchange: &'static str,
@@ -19,22 +19,9 @@ pub async fn crawl(
     //     return;
     // }
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
-    let (arc_tx, arc_rx) = std::sync::mpsc::channel::<Arc<Message>>();
-
-    // Add a thread to convert Message to Arc<Message>.
-    let message_convert_task = {
-        let arc_tx = arc_tx.clone();
-        tokio::task::spawn(async move {
-            for msg in rx {
-                if let Err(e) = arc_tx.send(Arc::new(msg)) {
-                    error!("failed to send the Message to Arc<Message> channel: {e}");
-                }
-            }
-        })
-    };
 
     let writer_threads = create_writer_threads(
-        arc_rx,
+        rx,
         data_dir,
         redis_url,
         data_deal_type,
@@ -48,7 +35,7 @@ pub async fn crawl(
     } else if msg_type == MessageType::OpenInterest {
         tokio::task::spawn_blocking(move || crawl_open_interest(exchange, market_type, tx));
     } else if msg_type == MessageType::Other {
-        crawl_other(exchange, market_type, arc_tx).await;
+        crawl_other(exchange, market_type, tx).await;
     } else {
         match msg_type {
             MessageType::BBO => {
@@ -99,11 +86,6 @@ pub async fn crawl(
     }
 
     futures::future::join_all(writer_threads.into_iter()).await;
-
-    message_convert_task
-        .await
-        .expect("failed to run the convert task");
-        
 }
 
 #[tokio::main(flavor = "multi_thread")]

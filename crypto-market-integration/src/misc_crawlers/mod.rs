@@ -1,4 +1,4 @@
-use std::sync::{mpsc::Sender, Arc};
+use std::sync::mpsc::Sender;
 
 use crypto_crawler::Message;
 use crypto_market_type::MarketType;
@@ -11,7 +11,7 @@ mod huobi;
 
 mod utils;
 
-pub async fn crawl_other(exchange: &str, market_type: MarketType, tx: Sender<Arc<Message>>) {
+pub async fn crawl_other(exchange: &str, market_type: MarketType, tx: Sender<Message>) {
     match exchange {
         "binance" => binance::crawl_other(market_type, tx).await,
         "bitmex" => bitmex::crawl_other(market_type, tx).await,
