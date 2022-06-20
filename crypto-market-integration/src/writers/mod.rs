@@ -13,7 +13,6 @@ use redis::{self, Commands};
 use std::io::Write;
 use std::{
     collections::HashMap,
-    path::Path,
     sync::{
         mpsc::{Receiver, Sender},
         Arc,
@@ -29,47 +28,6 @@ pub trait Writer {
 pub use file_writer::FileWriter;
 
 use crate::data::encode_orderbook;
-
-
-// async fn create_file_writer_thread(rx: Receiver<Message>, data_dir: String) {
-//     tokio::task::spawn(async move {
-//         let mut writers: HashMap<String, FileWriter> = HashMap::new();
-//         for msg in rx {
-//             let msg = Arc::new(msg);
-//             let file_name = format!("{}.{}.{}", msg.exchange, msg.market_type, msg.msg_type);
-//             if !writers.contains_key(&file_name) {
-//                 let data_dir = Path::new(&data_dir)
-//                     .join(msg.msg_type.to_string())
-//                     .join(&msg.exchange)
-//                     .join(msg.market_type.to_string())
-//                     .into_os_string();
-//                 std::fs::create_dir_all(data_dir.as_os_str()).unwrap();
-//                 let file_path = Path::new(data_dir.as_os_str())
-//                     .join(file_name.clone())
-//                     .into_os_string();
-//                 writers.insert(
-//                     file_name.clone(),
-//                     FileWriter::new(file_path.as_os_str().to_str().unwrap()),
-//                 );
-//             }
-
-//             let s = serde_json::to_string(msg.as_ref()).unwrap();
-
-//             if let Some(writer) = writers.get_mut(&file_name) {
-//                 writer.write(&s);
-//             }
-//             // // copy to redis
-//             // if let Some(ref tx_redis) = tx_redis {
-//             //     tx_redis.send(msg).unwrap();
-//             // }
-//         }
-//         for mut writer in writers {
-//             writer.1.close();
-//         }
-//     })
-//     .await
-//     .expect("create_file_writer_thread failed");
-// }
 
 
 fn connect_redis(redis_url: &str) -> Result<redis::Connection, redis::RedisError> {

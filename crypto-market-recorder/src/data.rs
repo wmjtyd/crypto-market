@@ -26,8 +26,8 @@ pub static INFOTYPE: phf::Map<&'static str, u8> = phf_map! {
 pub fn long_to_hex(num: i64) -> String {
     let num_hex = format!("{:x}", num); // to hex
     let mut num_hex_len = num_hex.len() / 2;
-    if (num_hex_len * 2 < num_hex.len()) {
-        num_hex_len = (num_hex_len + 1);
+    if num_hex_len * 2 < num_hex.len() {
+        num_hex_len = num_hex_len + 1;
     }
     let pad_len = num_hex_len * 2;
     let long_hex = format!("{0:0>pad_len$}", num_hex, pad_len = pad_len);
@@ -63,7 +63,7 @@ fn hex_to_byte(mut hex: String) -> Vec<i8> {
 
 fn encode_num_to_bytes(mut value: String) -> [i8; 5] {
     let mut result: [i8; 5] = [0; 5];
-    let mut e = 0;
+    let e = 0;
 
     // if value.find("E-") != Some(0) {
     //     let split: Vec<&str> = value.split("E-").collect();
@@ -364,6 +364,8 @@ pub fn encode_orderbook(orderbook: &OrderBookMsg) -> Vec<i8> {
         MessageType::Candlestick => 9,
         MessageType::OpenInterest => 10,
         MessageType::FundingRate => 11,
+        MessageType::LongShortRatio => todo!(),
+        MessageType::TakerVolume => todo!(),
         // MessageType::LongShortRatio => 12,
         // MessageType::TakerVolume => 12,
     };
@@ -411,7 +413,7 @@ pub fn encode_orderbook(orderbook: &OrderBookMsg) -> Vec<i8> {
     orderbook_bytes
 }
 
-fn decode_orderbook(payload: Vec<i8>) -> OrderBookMsg {
+pub fn decode_orderbook(payload: Vec<i8>) -> OrderBookMsg {
     let mut data_byte_index = 0;
 
     //1、交易所时间戳:6 or 8 字节时间戳
