@@ -20,20 +20,24 @@ pub async fn crawl(
     // }
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
 
-    let writer_threads = create_writer_threads(
-        rx,
-        data_dir,
-        redis_url,
-        data_deal_type,
-        exchange,
-        market_type,
-        msg_type,
-    );
+    let data_deal_type = data_deal_type.to_string();
+    tokio::task::spawn(async move {
+        let writer_threads = create_writer_threads(
+            rx,
+            data_dir,
+            redis_url,
+            &data_deal_type,
+            exchange,
+            market_type,
+            msg_type,
+        );
+        futures::future::join_all(writer_threads.into_iter()).await;
+    });
 
     if msg_type == MessageType::Candlestick {
         crawl_candlestick(exchange, market_type, None, tx).await;
     } else if msg_type == MessageType::OpenInterest {
-        tokio::task::spawn_blocking(move || crawl_open_interest(exchange, market_type, tx));
+        tokio::task::spawn_blocking(move || crawl_open_interest(exchange, market_type, tx)).await.unwrap();
     } else if msg_type == MessageType::Other {
         crawl_other(exchange, market_type, tx).await;
     } else {
@@ -84,8 +88,6 @@ pub async fn crawl(
             _ => panic!("Not implemented"),
         };
     }
-
-    futures::future::join_all(writer_threads.into_iter()).await;
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -170,11 +172,7 @@ async fn main() {
         data_dir,
         redis_url,
         data_deal_type,
-        if specified_symbols.is_empty() {
-            None
-        } else {
-            Some(&specified_symbols)
-        },
+        Some(&specified_symbols),
     )
     .await;
 }
