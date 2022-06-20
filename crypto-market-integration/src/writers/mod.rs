@@ -89,7 +89,7 @@ async fn create_nanomsg_writer_thread(
                     msg.exchange, msg.market_type, msg.msg_type
                 );
                 let topic = String::from("");
-                let mut socket = Socket::new(Protocol::Sub).unwrap();
+                let mut socket = Socket::new(Protocol::Pub).unwrap();
                 let _setopt = socket.subscribe(topic.as_ref());
                 let _endpoint = socket
                     .connect(ipc_exchange_market_type_msg_type.as_str())
@@ -147,6 +147,7 @@ async fn create_nanomsg_writer_thread(
                         let order_book_bytes = encode_orderbook(orderbook);
                         // send
                         let order_book_bytes_u8 = unsafe{std::mem::transmute::<&[i8], &[u8]>(&order_book_bytes)};
+                        // println!("{:?}", String::from_utf8_lossy(order_book_bytes_u8));
                         nanomsg_writer.write(order_book_bytes_u8).unwrap();
                     }
                     _ => panic!("Not implemented"),
