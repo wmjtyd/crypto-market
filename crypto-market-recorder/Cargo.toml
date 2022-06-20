@@ -1,0 +1,39 @@
+[package]
+name = "crypto-market-recorder"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crypto-crawler = "4.3.4"
+crypto-markets = "1.2.5"
+crypto-market-type = "1.1.0"
+crypto-msg-parser = "2.2.7"
+crypto-msg-type = "1.0.6"
+crypto-pair = "2.2.7"
+crypto-rest-client = "0.9.0"
+crypto-ws-client = "4.11.3"
+redis = "0.21.5"
+reopen = { version = "1.0.3", features = ["signals"] }
+serde_json = "1.0.81"
+signal-hook = { version = "0.3.14", features = ["extended-siginfo"] }
+log = "0.4.17"
+env_logger = "0.9.0"
+tokio = { version = "1.18.2", features = ["rt-multi-thread", "macros"] }
+lazy_static = "1.4.0"
+slack-hook = "0.8.0"
+openssl = { version = "0.10", features = ["vendored"] }
+nanomsg = "0.7.2"
+chrono = "0.4.19"
+
+rust_decimal = "1.23.1"
+rust_decimal_macros = "1.23.1"
+phf = { version = "0.10.1", features = ["macros"] }
+futures = "0.3.21"
+
+[profile.release]
+lto = true
+strip = "debuginfo"
+codegen-units = 1
+opt-level="z"
