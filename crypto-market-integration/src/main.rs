@@ -140,13 +140,11 @@ async fn main() {
         Some(url)
     };
 
-    let specified_symbols = if args.len() == 5 {
-        Vec::new()
+    let specified_symbols = if args.len() == 6 {
+        let sym: Vec<&str> = args[5].split(",").collect();
+        sym.iter().map(|s| s.to_string()).collect()
     } else {
-        let mut symbols = fetch_symbols_retry(exchange, market_type);
-        symbols.retain(|symbol| args[5].split(',').any(|part| symbol.contains(part)));
-        info!("target symbols: {:?}", symbols);
-        symbols
+        fetch_symbols_retry(exchange, market_type)
     };
     
     // let mut specified_symbols = Vec::new();
