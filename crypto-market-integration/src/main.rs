@@ -3,7 +3,7 @@ use crypto_crawler::*;
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use log::*;
-use std::str::FromStr;
+use std::{str::FromStr, env};
 
 pub async fn crawl(
     exchange: &'static str,
@@ -21,6 +21,7 @@ pub async fn crawl(
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
 
     let data_deal_type = data_deal_type.to_string();
+    
     tokio::task::spawn(async move {
         let writer_threads = create_writer_threads(
             rx,
@@ -94,14 +95,14 @@ pub async fn crawl(
 async fn main() {
     env_logger::init();
 
-    // let args: Vec<String> = env::args().collect();
-    // if args.len() != 4 && args.len() != 5 {
-    //     println!("Usage: carbonbot <exchange> <market_type> <msg_type> <data_deal_type> [comma_seperated_symbols]");
-    //     return;
-    // }
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 5 && args.len() != 6 {
+        println!("Usage: carbonbot <exchange> <market_type> <msg_type> <data_deal_type> [comma_seperated_symbols]");
+        return;
+    }
 
-    let args = vec!["carbonbot".to_string(), "binance".to_string(), "spot".to_string(),  
-                                  "l2_topk".to_string(),  "2".to_string(),  "BTCUSDT".to_string()];
+    // let args = vec!["carbonbot".to_string(), "binance".to_string(), "spot".to_string(),  
+    //                               "l2_topk".to_string(),  "2".to_string(),  "BTCUSDT".to_string()];
 
     let exchange: &'static str = Box::leak(args[1].clone().into_boxed_str());
 
@@ -139,17 +140,17 @@ async fn main() {
         Some(url)
     };
 
-    // let specified_symbols = if args.len() == 6 {
-    //     Vec::new().push(args[5].as_str());
-    // } else {
-    //     let mut symbols = fetch_symbols_retry(exchange, market_type);
-    //     symbols.retain(|symbol| args[5].split(',').any(|part| symbol.contains(part)));
-    //     info!("target symbols: {:?}", symbols);
-    //     symbols
-    // };
+    let specified_symbols = if args.len() == 5 {
+        Vec::new()
+    } else {
+        let mut symbols = fetch_symbols_retry(exchange, market_type);
+        symbols.retain(|symbol| args[5].split(',').any(|part| symbol.contains(part)));
+        info!("target symbols: {:?}", symbols);
+        symbols
+    };
     
-    let mut specified_symbols = Vec::new();
-    specified_symbols.push(args[5].as_str().to_string());
+    // let mut specified_symbols = Vec::new();
+    // specified_symbols.push(args[5].as_str().to_string());
 
     // if data_dir.is_none() && redis_url.is_none() {
     //     panic!("The environment variable DATA_DIR and REDIS_URL are not set, at least one of them should be set");

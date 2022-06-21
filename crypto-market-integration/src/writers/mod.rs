@@ -85,14 +85,13 @@ async fn create_nanomsg_writer_thread(
             let file_name = format!("{}.{}.{}", msg.exchange, msg.market_type, msg.msg_type);
             if !writers.contains_key(&file_name) {
                 let ipc_exchange_market_type_msg_type = format!(
-                    "ipc:///tmp/{}/{}/{}.ipc",
+                    "ipc:///tmp/{}_{}_{}.ipc",
                     msg.exchange, msg.market_type, msg.msg_type
                 );
                 let topic = String::from("");
                 let mut socket = Socket::new(Protocol::Pub).unwrap();
-                let _setopt = socket.subscribe(topic.as_ref());
                 let _endpoint = socket
-                    .connect(ipc_exchange_market_type_msg_type.as_str())
+                    .bind(ipc_exchange_market_type_msg_type.as_str())
                     .unwrap();
 
                 writers.insert(file_name.clone(), socket);
@@ -171,7 +170,7 @@ pub fn create_writer_threads(
     data_deal_type: &str,
     exchange: &'static str,
     market_type: MarketType,
-    msg_type: MessageType,
+    msg_type: MessageType
 ) -> Vec<BoxFuture<'static, ()>> {
     
     let mut threads = Vec::new();
