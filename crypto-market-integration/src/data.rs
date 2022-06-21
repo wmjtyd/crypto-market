@@ -8,7 +8,7 @@ use rust_decimal::{Decimal, prelude::ToPrimitive};
 pub static EXANGE: phf::Map<&'static str, u8> = phf_map! {
     "crypto" => 1,
     "ftx" => 2,
-    "binance" => 2,
+    "binance" => 3,
 };
 
 pub static SYMBLE: phf::Map<&'static str, u8> = phf_map! {
