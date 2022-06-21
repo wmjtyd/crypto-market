@@ -196,7 +196,7 @@ fn main() {
                     fin
                 );
 
-                print!("{}", unsafe {
+                println!("r: -> {}", unsafe {
                     std::str::from_utf8_unchecked(stream_buf)
                 });
 

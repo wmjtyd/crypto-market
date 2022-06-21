@@ -116,8 +116,6 @@ struct Client {
 async fn main() {
     let mut service = Vec::new();
 
-
-
     // 连接初始
     service.push(thread::spawn(|| server_connection()));
 
@@ -135,6 +133,7 @@ async fn main() {
 
     for s in service {
         s.join().unwrap();
+        break;
     }
 }
 
@@ -352,6 +351,7 @@ fn server_connection() -> ! {
                     continue 'read;
                 },
             };
+            
 
             println!("{} processed {} bytes", client.conn.trace_id(), read);
 
@@ -490,20 +490,40 @@ fn server_distribute(){
 }
 
 fn distribute(key: String, data: &[u8]) {
+    let socket = SERVER.socket.clone();
     let client_take = match CLIENT_TAKE.lock() {
         Ok(v) => v,
         Err(_) => return,
     };
-    
     let take = match client_take.get(&key) {
         Some(v) => v,
         None => return,
     };
     let mut clients = CLIENT_LIST.lock().unwrap();
+    let mut out = [0u8;1024];
     for cid in take {
         let client = clients.get_mut(&cid).unwrap();
-        let stream_id = client.partial_responses.len();
-        client.conn.stream_send(stream_id as u64, data, true).unwrap();
+
+
+        if client.conn.is_established() {
+            // let stream_id = client.partial_responses.len() + 1;
+
+            // error: not writable
+            // if let Some(stream_id) = client.conn.writable().next() {
+            //     if let Err(e) = client.conn.stream_send(stream_id, &data, true) {
+            //         println!("error: {:?}", e);
+            //     };
+            // };
+
+            for stream_id in client.conn.writable() {
+                if let Err(e) = client.conn.stream_send(stream_id, &data, false) {
+                    println!("error: {:?}", e);
+                };
+            }
+
+            send(client, socket.clone(), &mut out);
+        }
+        
     }
 }
 
