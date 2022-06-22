@@ -1,10 +1,8 @@
-pub(super) mod file_writer;
 pub(super) mod file_save;
+pub(super) mod file_writer;
 
 use crypto_crawler::*;
-use crypto_msg_parser::{
-    parse_bbo, parse_l2, parse_l2_topk, parse_trade,
-};
+use crypto_msg_parser::{parse_bbo, parse_l2, parse_l2_topk, parse_trade};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
 use nanomsg::{Protocol, Socket};
@@ -28,7 +26,6 @@ pub trait Writer {
 pub use file_writer::FileWriter;
 
 use crate::data::encode_orderbook;
-
 
 fn connect_redis(redis_url: &str) -> Result<redis::Connection, redis::RedisError> {
     assert!(!redis_url.is_empty(), "redis_url is empty");
@@ -70,6 +67,25 @@ fn create_redis_writer_thread(rx: Receiver<Arc<Message>>, redis_url: String) -> 
     })
 }
 
+fn writers_key(
+    writers: &mut HashMap<String, Socket>,
+    name: &String
+) -> String {
+    let file_name = name.replacen("\\", "-", 1);
+
+    if !writers.contains_key(&file_name) {
+        let ipc_exchange_market_type_msg_type = file_name.replacen(".", "_", 3);
+        let topic = String::from("");
+        let mut socket = Socket::new(Protocol::Pub).unwrap();
+        let _endpoint = socket
+            .bind(ipc_exchange_market_type_msg_type.as_str())
+            .unwrap();
+
+        writers.insert(file_name.clone(), socket);
+    }
+    file_name
+}
+
 async fn create_nanomsg_writer_thread(
     rx: Receiver<Message>,
     tx_redis: Option<Sender<Arc<Message>>>,
@@ -82,82 +98,108 @@ async fn create_nanomsg_writer_thread(
         for msg in rx {
             println!("msg ->> yes");
             let msg = Arc::new(msg);
-            let file_name = format!("{}.{}.{}", msg.exchange, msg.market_type, msg.msg_type);
-            if !writers.contains_key(&file_name) {
-                let ipc_exchange_market_type_msg_type = format!(
-                    "ipc:///tmp/{}_{}_{}.ipc",
-                    msg.exchange, msg.market_type, msg.msg_type
-                );
-                let topic = String::from("");
-                let mut socket = Socket::new(Protocol::Pub).unwrap();
-                let _endpoint = socket
-                    .bind(ipc_exchange_market_type_msg_type.as_str())
-                    .unwrap();
-
-                writers.insert(file_name.clone(), socket);
-            }
 
             let s = serde_json::to_string(msg.as_ref()).unwrap();
 
-            if let Some(nanomsg_writer) = writers.get_mut(&file_name) {
-                let msg = msg.clone();
-                match msg_type {
-                    MessageType::BBO => {
-                        let received_at = 1651122265862;
-                        let _bbo_msg = tokio::task::spawn_blocking(move || {
-                            parse_bbo(exchange, MarketType::Spot, &msg.json, Some(received_at))
-                                .unwrap()
-                        })
-                        .await
-                        .unwrap();
-                        // encode
-                        nanomsg_writer.write(s.as_bytes()).unwrap();
-                    }
-                    MessageType::Trade => {
-                        let trade = tokio::task::spawn_blocking(move || {
-                            parse_trade(exchange, MarketType::Spot, &msg.json).unwrap()
-                        })
-                        .await
-                        .unwrap();
-                        let _trade = &trade[0];
-                        // encode
-                        nanomsg_writer.write(s.as_bytes()).unwrap();
-                    }
-                    MessageType::L2Event => {
-                        let orderbook = tokio::task::spawn_blocking(move || {
-                            parse_l2(exchange, MarketType::Spot, &msg.json, None).unwrap()
-                        })
-                        .await
-                        .unwrap();
-                        let _orderbook = &orderbook[0];
-                        // encode
-                        nanomsg_writer.write(s.as_bytes()).unwrap();
-                    }
-                    MessageType::L2TopK => {
-                        let received_at = msg.received_at as i64;
-                        let orderbook = tokio::task::spawn_blocking(move || {
-                            parse_l2_topk(exchange, MarketType::Spot, &msg.json, Some(received_at))
-                                .unwrap()
-                        })
-                        .await
-                        .unwrap();
-                        let orderbook = &orderbook[0];
-                        // encode
-                        let order_book_bytes = encode_orderbook(orderbook);
-                        // send
-                        let order_book_bytes_u8 = unsafe{std::mem::transmute::<&[i8], &[u8]>(&order_book_bytes)};
-                        // println!("{:?}", String::from_utf8_lossy(order_book_bytes_u8));
-                        nanomsg_writer.write(order_book_bytes_u8).unwrap();
-                    }
-                    _ => panic!("Not implemented"),
-                };
-            }
+            let msg_r = msg.clone();
+            match msg_type {
+                MessageType::BBO => {
+                    let received_at = 1651122265862;
+                    let bbo_msg = tokio::task::spawn_blocking(move || {
+                        parse_bbo(exchange, MarketType::Spot, &msg_r.json, Some(received_at)).unwrap()
+                    })
+                    .await
+                    .unwrap();
 
+                    let key = format!("{}.{}.{}.{}", 
+                        msg.exchange, msg.market_type, msg.msg_type, bbo_msg.symbol);
+                    let key = writers_key(&mut writers, &key);
+                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
+                        v
+                    } else {
+                        continue;
+                    };
+
+                    // encode
+                    nanomsg_writer.write(s.as_bytes()).unwrap();
+                }
+                MessageType::Trade => {
+                    let trade = tokio::task::spawn_blocking(move || {
+                        parse_trade(exchange, MarketType::Spot, &msg_r.json).unwrap()
+                    })
+                    .await
+                    .unwrap();
+
+                    let key = format!("{}.{}.{}.{}", 
+                        msg.exchange, msg.market_type, msg.msg_type, trade[0].symbol);
+                    let key = writers_key(&mut writers, &key);
+                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
+                        v
+                    } else {
+                        continue;
+                    };
+
+                    let _trade = &trade[0];
+                    // encode
+                    nanomsg_writer.write(s.as_bytes()).unwrap();
+                }
+                MessageType::L2Event => {
+                    let orderbook = tokio::task::spawn_blocking(move || {
+                        parse_l2(exchange, MarketType::Spot, &msg_r.json, None).unwrap()
+                    })
+                    .await
+                    .unwrap();
+
+                    let key = format!("{}.{}.{}.{}", 
+                        msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol);
+                    let key = writers_key(&mut writers, &key);
+                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
+                        v
+                    } else {
+                        continue;
+                    };
+
+
+                    let _orderbook = &orderbook[0];
+                    // encode
+                    nanomsg_writer.write(s.as_bytes()).unwrap();
+                }
+                MessageType::L2TopK => {
+                    let received_at = msg.received_at as i64;
+                    let orderbook = tokio::task::spawn_blocking(move || {
+                        parse_l2_topk(exchange, MarketType::Spot, &msg_r.json, Some(received_at))
+                            .unwrap()
+                    })
+                    .await
+                    .unwrap();
+                    
+                    let key = format!("{}.{}.{}.{}", 
+                        msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol);
+                    let key = writers_key(&mut writers, &key);
+                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
+                        v
+                    } else {
+                        continue;
+                    };
+
+
+                    let orderbook = &orderbook[0];
+                    // encode
+                    let order_book_bytes = encode_orderbook(orderbook);
+                    // send
+                    let order_book_bytes_u8 =
+                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&order_book_bytes) };
+                    // println!("{:?}", String::from_utf8_lossy(order_book_bytes_u8));
+                    nanomsg_writer.write(order_book_bytes_u8).unwrap();
+                }
+                _ => panic!("Not implemented"),
+            };
             // copy to redis
             if let Some(ref tx_redis) = tx_redis {
                 tx_redis.send(msg).unwrap();
             }
         }
+
     })
     .await
     .expect("create_nanomsg_writer_thread failed");
@@ -170,9 +212,8 @@ pub fn create_writer_threads(
     data_deal_type: &str,
     exchange: &'static str,
     market_type: MarketType,
-    msg_type: MessageType
+    msg_type: MessageType,
 ) -> Vec<BoxFuture<'static, ()>> {
-    
     let mut threads = Vec::new();
 
     // if data_dir.is_none() && redis_url.is_none() {
