@@ -655,19 +655,25 @@ pub fn encode_trade(orderbook: &TradeMsg) -> Vec<i8> {
     orderbook_bytes
 }
 
-fn decode_trade(payload: Vec<u8>) -> TradeMsg {
+fn decode_trade(payload: Vec<i8>) -> TradeMsg {
+
     let mut data_byte_index = 0;
 
     //1、交易所时间戳:6 or 8 字节时间戳
-    let mut exchange_timestamp_array: [u8; 16] = [0; 16];
+    let mut exchange_timestamp_array: [i8; 16] = [0; 16];
     exchange_timestamp_array[10..].copy_from_slice(&payload[0..6]);
-    let exchange_timestamp = u128::from_be_bytes(exchange_timestamp_array);
+
+    let exchange_timestamp_array =
+        unsafe { std::mem::transmute::<[i8; 16], [u8; 16]>(exchange_timestamp_array) };
+    let exchange_timestamp = i128::from_be_bytes(exchange_timestamp_array);
     data_byte_index += 6;
 
     //2、收到时间戳:6 or 8 字节时间戳
-    let mut received_timestamp_array: [u8; 16] = [0; 16];
+    let mut received_timestamp_array: [i8; 16] = [0; 16];
     received_timestamp_array[10..].copy_from_slice(&payload[0..6]);
-    let received_timestamp = u128::from_be_bytes(received_timestamp_array);
+    let received_timestamp_array =
+        unsafe { std::mem::transmute::<[i8; 16], [u8; 16]>(received_timestamp_array) };
+    let received_timestamp = i128::from_be_bytes(received_timestamp_array);
     data_byte_index += 6;
 
     //3、EXANGE 1字节信息标识
@@ -677,6 +683,7 @@ fn decode_trade(payload: Vec<u8>) -> TradeMsg {
         1 => "crypto",
         2 => "ftx",
         3 => "binance",
+        11 => "okx",
         _ => "unknow",
     };
 
@@ -716,9 +723,10 @@ fn decode_trade(payload: Vec<u8>) -> TradeMsg {
     //6、SYMBLE 2字节信息标识
     let symbol_bytes = &payload[data_byte_index..data_byte_index + 2];
     data_byte_index += 2;
-    let mut symbol_bytes_dst = [0u8; 2];
+    let mut symbol_bytes_dst = [0i8; 2];
     symbol_bytes_dst.clone_from_slice(symbol_bytes);
-    let symbol = u16::from_be_bytes(symbol_bytes_dst);
+    let symbol_bytes_dst = unsafe { std::mem::transmute::<[i8; 2], [u8; 2]>(symbol_bytes_dst) };
+    let symbol = i16::from_be_bytes(symbol_bytes_dst);
     let pair = match symbol {
         1 => "BTC/USDT",
         2 => "BTC/USD",
@@ -736,34 +744,39 @@ fn decode_trade(payload: Vec<u8>) -> TradeMsg {
     };
 
     // price
-    let mut price_array: [u8; 8] = [0; 8];
+    let mut price_array: [i8; 8] = [0; 8];
     price_array[4..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    let price_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(price_array) };
     let price_int = i64::from_be_bytes(price_array);
 
     let price_hex_p = payload[data_byte_index + 4];
     let price_hex_p_array = [price_hex_p];
-    let mut price_p_array: [u8; 4] = [0; 4];
+    let mut price_p_array: [i8; 4] = [0; 4];
     price_p_array[3] = price_hex_p_array[0];
+    let price_p_array = unsafe { std::mem::transmute::<[i8; 4], [u8; 4]>(price_p_array) };
     let price_p_int = u32::from_be_bytes(price_p_array);
 
     let price = Decimal::new(price_int, price_p_int);
     let pricef = price.to_f64();
 
     // quant
-    let mut quant_array = [0u8; 8];
-    quant_array[4..].copy_from_slice(&payload[data_byte_index + 5..data_byte_index + 5 + 4]);
+    let mut quant_array = [0i8; 8];
+    quant_array[4..]
+        .copy_from_slice(&payload[data_byte_index + 5..data_byte_index + 5 + 4]);
+    let quant_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(quant_array) };
     let quant_int = i64::from_be_bytes(quant_array);
 
     let quant_hex_p = payload[data_byte_index + 5 + 4];
     let quant_hex_p_array = [quant_hex_p];
-    let mut quant_p_array = [0u8; 4];
+    let mut quant_p_array = [0i8; 4];
     quant_p_array[3] = quant_hex_p_array[0];
+    let quant_p_array = unsafe { std::mem::transmute::<[i8; 4], [u8; 4]>(quant_p_array) };
     let quant_p_int = u32::from_be_bytes(quant_p_array);
 
     let quant = Decimal::new(quant_int, quant_p_int);
     let quantf = quant.to_f64();
 
-    let orderbook = TradeMsg {
+    let trade = TradeMsg {
         exchange: exchange_name.to_string(),
         market_type: market_type_name,
         msg_type: message_type_name,
@@ -779,5 +792,5 @@ fn decode_trade(payload: Vec<u8>) -> TradeMsg {
         json: "".to_string(),
     };
 
-    orderbook
+    trade
 }
