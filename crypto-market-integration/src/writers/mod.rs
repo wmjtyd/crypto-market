@@ -75,6 +75,7 @@ fn writers_key(
 
     if !writers.contains_key(&file_name) {
         let ipc_exchange_market_type_msg_type = file_name.replacen(".", "_", 3);
+        let ipc_exchange_market_type_msg_type = format!("ipc:///tmp/{}.ipc", ipc_exchange_market_type_msg_type);
         let topic = String::from("");
         let mut socket = Socket::new(Protocol::Pub).unwrap();
         let _endpoint = socket
