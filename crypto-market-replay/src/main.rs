@@ -3,14 +3,17 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         TypedHeader,
     },
-    response::IntoResponse,
-    routing::{get},
-    Router,
+    response::{IntoResponse, Headers},
+    routing::{get, post},
+    Router, http::{StatusCode, header}, body::StreamBody, Json,
 };
 use std::net::SocketAddr;
 use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
+use tokio_util::io::ReaderStream;
+use serde::{Deserialize};
+
 
 #[tokio::main]
 async fn main() {
@@ -22,6 +25,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
+        .route("/file", post(handler))
         //绑定websocket路由
         .route("/ws", get(ws_handler))
         .layer(
@@ -67,4 +71,37 @@ async fn handle_socket(mut socket: WebSocket) {
             return;
         }
     }
+}
+
+async fn handler(
+    Json(params): Json<Params>,
+) -> impl IntoResponse {
+
+    //Todo: 要换成根据参数对应的数据
+    let file = match tokio::fs::File::open("data.txt").await {
+        Ok(file) => file,
+        Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
+    };
+    let stream = ReaderStream::new(file);
+    let body = StreamBody::new(stream);
+
+    let headers = Headers([
+        (header::CONTENT_TYPE, "text/toml; charset=utf-8"),
+        (
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"Cargo.toml\"",
+        ),
+    ]);
+
+    Ok((headers, body))
+}
+
+#[derive(Deserialize)]
+struct Params {
+    exchange: String,
+    market_type:String,
+    msg_type:String,
+    symbols:String,
+    begin_datetime:i64,
+    end_datetime:i64
 }
