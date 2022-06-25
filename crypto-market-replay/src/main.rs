@@ -1,19 +1,23 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        TypedHeader,
+        TypedHeader, Extension,
     },
     response::{IntoResponse, Headers},
     routing::{get, post},
     Router, http::{StatusCode, header}, body::StreamBody, Json,
 };
-use std::net::SocketAddr;
+use crypto_msg_parser::parse_l2_topk;
+use serde_json::Value;
+use tokio::sync::Mutex;
+use std::{net::SocketAddr, collections::HashMap, sync::{mpsc::Receiver, Arc}};
 use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tokio_util::io::ReaderStream;
-use serde::{Deserialize};
-
+use serde::{Deserialize,Serialize};
+use serde_json::{json};
+use crypto_crawler::{crawl_l2_event, MarketType, crawl_l2_topk, Message as CryptoMessage , crawl_bbo, crawl_candlestick, crawl_funding_rate, MessageType};
 
 #[tokio::main]
 async fn main() {
@@ -31,7 +35,8 @@ async fn main() {
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-        );
+        )
+        .layer(Extension(Arc::new(AppState::default())));
 
     
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -54,26 +59,37 @@ async fn ws_handler(
 }
 
 async fn handle_socket(mut socket: WebSocket) {
-    if let Some(msg) = socket.recv().await {
-        if let Ok(msg) = msg {
-            println!("Client says: {:?}", msg);
-            //客户端发什么，服务端就回什么（只是演示而已）
-            if socket
-                .send(Message::Text(format!("{:?}", msg)))
-                .await
-                .is_err()
-            {
+    loop {
+        if let Some(msg) = socket.recv().await {
+            if let Ok(msg) = msg {
+                match msg {
+                    Message::Text(t) => {
+                       let actions= processing_requests(&t).await;
+ 
+                    }
+                    Message::Binary(_) => {
+                        println!("client sent binary data");
+                    }
+                    Message::Ping(_) => {
+                        println!("socket ping");
+                    }
+                    Message::Pong(_) => {
+                        println!("socket pong");
+                    }
+                    Message::Close(_) => {
+                        println!("client disconnected");
+                        return;
+                    }
+                }
+            } else {
                 println!("client disconnected");
                 return;
             }
-        } else {
-            println!("client disconnected");
-            return;
         }
     }
 }
 
-async fn handler(
+pub async fn handler(
     Json(params): Json<Params>,
 ) -> impl IntoResponse {
 
@@ -96,12 +112,41 @@ async fn handler(
     Ok((headers, body))
 }
 
+
+
 #[derive(Deserialize)]
-struct Params {
-    exchange: String,
-    market_type:String,
-    msg_type:String,
-    symbols:String,
-    begin_datetime:i64,
-    end_datetime:i64
+pub struct Params {
+    pub exchange: String,
+    pub market_type:String,
+    pub msg_type:String,
+    pub symbols:String,
+    pub begin_datetime:i64,
+    pub end_datetime:i64
+}
+#[derive(Serialize,Deserialize)]
+pub struct Action {
+    pub action: String,
+    pub params: Value,
+    pub echo: String,
+}
+
+#[derive(Default)]
+pub struct AppState {
+    pub receiver: Mutex<HashMap<i64,Receiver<Message>>>,
+}
+pub  async fn processing_requests(str: &str){
+    let params:Action = serde_json::from_str(str).unwrap();
+
+    // let (tx, rx) = std::sync::mpsc::channel();
+    // tokio::task::spawn(async move {
+    //     for msg in rx {
+    //         let msg:CryptoMessage = msg;
+    //         println!("{:#}", msg);
+    //         println!("2");
+    //         let received_at = msg.received_at as i64;
+    //         let orderbook = tokio::task::spawn_blocking(move || parse_l2_topk("binance", MarketType::Spot, &(msg as CryptoMessage).json, Some(received_at)).unwrap()).await.unwrap();
+    //         let orderbook = &orderbook[0];
+    //         }
+    // });
+
 }
