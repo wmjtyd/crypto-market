@@ -16,6 +16,7 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
+use websocket::{init_config, config::config::ApplicationConfig};
 use std::sync::Mutex;
 use std::{
     collections::HashMap,
@@ -25,13 +26,15 @@ use std::{
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use chrono::{DateTime, Local, Utc, TimeZone, Timelike};
+
+
 #[tokio::main]
 async fn main() {
     if std::env::var_os("RUST_LOG").is_none() {
         std::env::set_var("RUST_LOG", "example_websockets=debug,tower_http=debug")
     }
     tracing_subscriber::fmt::init();
-
+    let application_config = init_config().await;
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/file", post(handler))
@@ -41,7 +44,9 @@ async fn main() {
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         )
-        .layer(Extension(Arc::new(AppState::default())));
+        .layer(Extension(Arc::new(AppState::default())))
+        .layer(Extension(application_config))
+        ;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
@@ -55,21 +60,22 @@ async fn ws_handler(
     ws: WebSocketUpgrade,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     Extension(state): Extension<Arc<AppState>>,
+    Extension(application_config): Extension<ApplicationConfig>,
 ) -> impl IntoResponse {
     if let Some(TypedHeader(user_agent)) = user_agent {
         println!("`{}` connected", user_agent.as_str());
     }
 
-    ws.on_upgrade(|socket| handle_socket(socket, state))
+    ws.on_upgrade(|socket| handle_socket(socket, state,application_config))
 }
 
-async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
+async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>,application_config:ApplicationConfig) {
     loop {
         if let Some(msg) = socket.recv().await {
             if let Ok(msg) = msg {
                 match msg {
                     RawMessage::Text(t) => {
-                        let actions = processing_requests(&t, &state).await;
+                        let actions = processing_requests(&t, &state,application_config).await;
                     }
                     RawMessage::Binary(_) => {
                         println!("client sent binary data");
@@ -93,9 +99,9 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
     }
 }
 
-pub async fn handler(Json(params): Json<Params>) -> impl IntoResponse {
+pub async fn handler(Json(params): Json<Params>,Extension(application_config): Extension<ApplicationConfig>) -> impl IntoResponse {
     //Todo: 从配置文件读取配置
-    let src = "../".to_string() + &filename(&params);
+    let src = application_config.record_dir+"/" + &filename(&params);
     let file = match tokio::fs::File::open("data.txt").await {
         Ok(file) => file,
         Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
