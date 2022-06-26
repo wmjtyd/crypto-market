@@ -27,4 +27,5 @@ tokio-util = "0.7.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.68"
 serde_derive = "1.0.81"
- 
+ rand = "0.8.5"
+futures = "0.3.21"
