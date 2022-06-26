@@ -75,7 +75,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>,application_c
             if let Ok(msg) = msg {
                 match msg {
                     RawMessage::Text(t) => {
-                        let actions = processing_requests(&t, &state,application_config).await;
+                        let actions = processing_requests(&t, &state).await;
                     }
                     RawMessage::Binary(_) => {
                         println!("client sent binary data");
