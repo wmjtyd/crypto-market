@@ -1,3 +1,6 @@
 crypto-market-integration/target
 crypto-market-replay/target
 crypto-market-publisher/target
+.DS_Store
+*/Cargo.lock
+*.csv

@@ -2,7 +2,7 @@ pub(super) mod file_save;
 pub(super) mod file_writer;
 
 use crypto_crawler::*;
-use crypto_msg_parser::{parse_bbo, parse_l2, parse_l2_topk, parse_trade};
+use crypto_msg_parser::{parse_bbo, parse_l2, parse_l2_topk, parse_trade, parse_candlestick};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
 use nanomsg::{Protocol, Socket};
@@ -25,7 +25,7 @@ pub trait Writer {
 
 pub use file_writer::FileWriter;
 
-use crate::data::encode_orderbook;
+use crate::data::{encode_orderbook, encode_bbo, encode_trade, encode_kline};
 
 fn connect_redis(redis_url: &str) -> Result<redis::Connection, redis::RedisError> {
     assert!(!redis_url.is_empty(), "redis_url is empty");
@@ -67,6 +67,7 @@ fn create_redis_writer_thread(rx: Receiver<Arc<Message>>, redis_url: String) -> 
     })
 }
 
+
 fn writers_key(
     writers: &mut HashMap<String, Socket>,
     name: &String
@@ -74,9 +75,9 @@ fn writers_key(
     let file_name = name.replacen("\\", "-", 1);
 
     if !writers.contains_key(&file_name) {
-        let ipc_exchange_market_type_msg_type = file_name.replacen(".", "_", 3);
+        let ipc_exchange_market_type_msg_type = file_name.replacen(".", "_", 4);
         let ipc_exchange_market_type_msg_type = format!("ipc:///tmp/{}.ipc", ipc_exchange_market_type_msg_type);
-        let topic = String::from("");
+        debug!("{}", ipc_exchange_market_type_msg_type);
         let mut socket = Socket::new(Protocol::Pub).unwrap();
         let _endpoint = socket
             .bind(ipc_exchange_market_type_msg_type.as_str())
@@ -91,13 +92,14 @@ async fn create_nanomsg_writer_thread(
     rx: Receiver<Message>,
     tx_redis: Option<Sender<Arc<Message>>>,
     exchange: &'static str,
-    _market_type: MarketType,
+    market_type: MarketType,
     msg_type: MessageType,
+    period: Arc<String>
 ) {
     tokio::task::spawn(async move {
         let mut writers: HashMap<String, Socket> = HashMap::new();
         for msg in rx {
-            println!("msg ->> yes");
+            debug!("msg ->> yes");
             let msg = Arc::new(msg);
 
             let s = serde_json::to_string(msg.as_ref()).unwrap();
@@ -122,7 +124,11 @@ async fn create_nanomsg_writer_thread(
                     };
 
                     // encode
-                    nanomsg_writer.write(s.as_bytes()).unwrap();
+                    let bbo_msg_bytes_i8 = encode_bbo(&bbo_msg);
+                    let boo_msg_bytes_u8 =
+                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&bbo_msg_bytes_i8) };
+
+                    nanomsg_writer.write(boo_msg_bytes_u8).unwrap();
                 }
                 MessageType::Trade => {
                     let trade = tokio::task::spawn_blocking(move || {
@@ -142,7 +148,13 @@ async fn create_nanomsg_writer_thread(
 
                     let _trade = &trade[0];
                     // encode
-                    nanomsg_writer.write(s.as_bytes()).unwrap();
+                    let trade_bytes_i8 = encode_trade(&trade[0]);
+                    let trade_bytes_u8 =
+                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&trade_bytes_i8) };
+
+
+
+                    nanomsg_writer.write(trade_bytes_u8).unwrap();
                 }
                 MessageType::L2Event => {
                     let orderbook = tokio::task::spawn_blocking(move || {
@@ -173,6 +185,7 @@ async fn create_nanomsg_writer_thread(
                     })
                     .await
                     .unwrap();
+
                     
                     let key = format!("{}.{}.{}.{}", 
                         msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol);
@@ -192,6 +205,30 @@ async fn create_nanomsg_writer_thread(
                         unsafe { std::mem::transmute::<&[i8], &[u8]>(&order_book_bytes) };
                     // println!("{:?}", String::from_utf8_lossy(order_book_bytes_u8));
                     nanomsg_writer.write(order_book_bytes_u8).unwrap();
+                }
+                MessageType::Candlestick => {
+                    let kline_msg = tokio::task::spawn_blocking(move || {
+                        parse_candlestick(exchange, market_type, &msg_r.json, msg_type).unwrap()
+                    })
+                    .await
+                    .unwrap();
+
+                    let key = format!("{}.{}.{}.{}.{}", 
+                        msg.exchange, msg.market_type, msg.msg_type, kline_msg.symbol, period);
+                    let key = writers_key(&mut writers, &key);
+                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
+                        v
+                    } else {
+                        continue;
+                    };
+
+                    // encode
+                    let kline_msg_bytes_i8 = encode_kline(&kline_msg);
+                    let kline_msg_bytes_u8 =
+                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&kline_msg_bytes_i8) };
+
+
+                    nanomsg_writer.write(kline_msg_bytes_u8).unwrap();
                 }
                 _ => panic!("Not implemented"),
             };
@@ -214,6 +251,7 @@ pub fn create_writer_threads(
     exchange: &'static str,
     market_type: MarketType,
     msg_type: MessageType,
+    period: Arc<String>
 ) -> Vec<BoxFuture<'static, ()>> {
     let mut threads = Vec::new();
 
@@ -236,7 +274,7 @@ pub fn create_writer_threads(
     // } else {
     //     threads.push(create_redis_writer_thread(rx, redis_url.unwrap()));
     // }
-    threads.push(create_nanomsg_writer_thread(rx, None, exchange, market_type, msg_type).boxed());
+    threads.push(create_nanomsg_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed());
 
     threads
 }

@@ -13,6 +13,9 @@ lazy_static = "1"
 log = { version = "0.4", features = ["std"] }
 nanomsg = "0.7.2"
 tokio = { version = "0.2", features = ["full"] }
+clap = "~2.27.0"
+env_logger = "0.4.3"
+url = "1"
+carbonbot  = { path = "../crypto-market-integration"}
 
 [dev-dependencies]
-url = "1"

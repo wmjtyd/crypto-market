@@ -1,29 +1,37 @@
-use crypto_market_recorder::create_writer_threads;
+use clap::clap_app;
+use crypto_market_recorder::create_write_file_thread;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     env_logger::init();
 
-    // let args: Vec<String> = env::args().collect();
-    // if args.len() != 4 && args.len() != 5 {
-    //     println!("Usage: carbonbot <exchange> <market_type> <msg_type> <data_deal_type> [comma_seperated_symbols]");
-    //     return;
-    // }
+    let matches: clap::ArgMatches = clap_app!(quic =>
+            (about: "use save file")
+            (@arg EXCHANGE:     +required "exchange")
+            (@arg MARKET_TYPE:  +required "market_type")
+            (@arg MSG_TYPE:     +required "msg_type")
+            (@arg SYMBOL: +required "symbol")
+            (@arg PERIOD: "period")
+    )
+    .get_matches();
 
-    let args = vec!["/".to_string(),"carbonbot".to_string(), "binance".to_string(), "spot".to_string(),  
-                                  "l2_topk".to_string(),  "2".to_string(),  "BTCUSDT".to_string()];
 
-    let exchange: &'static str = Box::leak(args[1].clone().into_boxed_str());
-    
-    let venue = &args[1];
-    let symbol = &args[2];
-    let ipc_path = &args[3];
+    let exchange = matches.value_of("EXCHANGE").unwrap().to_string(); 
+    let market_type = matches.value_of("MARKET_TYPE").unwrap();
+    let msg_type = matches.value_of("MSG_TYPE").unwrap();
+    let symbol = matches.value_of("SYMBOL").unwrap();
 
-    let threads = create_writer_threads(
-        exchange,
-        venue, 
-        symbol,
-        ipc_path);
+    let ipc = if let Some(period) = matches.value_of("PERIOD") {
+        format!("{}_{}_{}_{}_{}", exchange, market_type, msg_type, symbol, period)
+    } else {
+        format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
+    };
 
-    futures::future::join_all(threads.into_iter()).await;
+    create_write_file_thread(
+        exchange.to_string(),
+        market_type.to_string(),
+        msg_type.to_string(),
+        ipc.to_string()
+    ).await;
+
 }

@@ -1,9 +1,11 @@
 use carbonbot::{crawl_other, create_writer_threads};
+use clap::clap_app;
 use crypto_crawler::*;
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use log::*;
-use std::{str::FromStr, env};
+use redis::IntoConnectionInfo;
+use std::{env, str::FromStr, sync::Arc};
 
 pub async fn crawl(
     exchange: &'static str,
@@ -13,6 +15,7 @@ pub async fn crawl(
     redis_url: Option<String>,
     data_deal_type: &str,
     symbols: Option<&[String]>,
+    period: String,
 ) {
     // if data_dir.is_none() && redis_url.is_none() {
     //     error!("Both DATA_DIR and REDIS_URL are not set");
@@ -21,7 +24,10 @@ pub async fn crawl(
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
 
     let data_deal_type = data_deal_type.to_string();
-    
+
+    let period = Arc::new(period);
+
+    let period_arc = period.clone();
     tokio::task::spawn(async move {
         let writer_threads = create_writer_threads(
             rx,
@@ -31,14 +37,27 @@ pub async fn crawl(
             exchange,
             market_type,
             msg_type,
+            period_arc,
         );
         futures::future::join_all(writer_threads.into_iter()).await;
     });
 
     if msg_type == MessageType::Candlestick {
-        crawl_candlestick(exchange, market_type, None, tx).await;
+        let mut symbol_interval_list = Vec::new();
+        if let Some(arry) = symbols {
+            let period = format!("{}", period);
+            let period = u64::from_str(&period).unwrap();
+            for symol in arry {
+                symbol_interval_list.push((symol.to_string(), period as usize));
+            }
+        }
+        let symbol_interval_list: &[(String, usize)] = &symbol_interval_list;
+        let symbol_interval_list = Some(symbol_interval_list);
+        crawl_candlestick(exchange, market_type, symbol_interval_list, tx).await;
     } else if msg_type == MessageType::OpenInterest {
-        tokio::task::spawn_blocking(move || crawl_open_interest(exchange, market_type, tx)).await.unwrap();
+        tokio::task::spawn_blocking(move || crawl_open_interest(exchange, market_type, tx))
+            .await
+            .unwrap();
     } else if msg_type == MessageType::Other {
         crawl_other(exchange, market_type, tx).await;
     } else {
@@ -95,18 +114,24 @@ pub async fn crawl(
 async fn main() {
     env_logger::init();
 
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 5 && args.len() != 6 {
-        println!("Usage: carbonbot <exchange> <market_type> <msg_type> <data_deal_type> [comma_seperated_symbols]");
-        return;
-    }
+    let matches: clap::ArgMatches = clap_app!(quic =>
+            (about: "use save file")
+            (@arg EXCHANGE:     +required "exchange")
+            (@arg MARKET_TYPE:  +required "market_type")
+            (@arg MSG_TYPE:     +required "msg_type")
+            (@arg DATA_DEAL_TYPE: +required "data_deal_type")
+            (@arg PERIOD: "period")
+            (@arg COMMA_SEPERATED_SYMBOLS: -c --comma_seperated_symbols +use_delimiter "comma_seperated_symbols")
+    )
+    .get_matches();
 
-    // let args = vec!["carbonbot".to_string(), "binance".to_string(), "spot".to_string(),  
+    // let args = vec!["carbonbot".to_string(), "binance".to_string(), "spot".to_string(),
     //                               "l2_topk".to_string(),  "2".to_string(),  "BTCUSDT".to_string()];
 
-    let exchange: &'static str = Box::leak(args[1].clone().into_boxed_str());
+    let exchange = matches.value_of("EXCHANGE").unwrap().to_string();
+    let exchange: &'static str = Box::leak(exchange.clone().into_boxed_str());
 
-    let market_type_str = args[2].as_str();
+    let market_type_str = matches.value_of("MARKET_TYPE").unwrap();
     let market_type = MarketType::from_str(market_type_str);
     if market_type.is_err() {
         println!("Unknown market type: {}", market_type_str);
@@ -114,7 +139,7 @@ async fn main() {
     }
     let market_type = market_type.unwrap();
 
-    let msg_type_str = args[3].as_str();
+    let msg_type_str = matches.value_of("MSG_TYPE").unwrap();
     let msg_type = MessageType::from_str(msg_type_str);
     if msg_type.is_err() {
         println!("Unknown msg type: {}", msg_type_str);
@@ -122,7 +147,7 @@ async fn main() {
     }
     let msg_type = msg_type.unwrap();
 
-    let data_deal_type = args[4].as_str();
+    let data_deal_type = matches.value_of("DATA_DEAL_TYPE").unwrap();
 
     let data_dir = if std::env::var("DATA_DIR").is_err() {
         info!("The DATA_DIR environment variable does not exist");
@@ -140,13 +165,17 @@ async fn main() {
         Some(url)
     };
 
-    let specified_symbols = if args.len() == 6 {
-        let sym: Vec<&str> = args[5].split(",").collect();
-        sym.iter().map(|s| s.to_string()).collect()
+    let period = matches.value_of("PERIOD").unwrap_or("");
+
+    let specified_symbols = if let Some(v) = matches.values_of("COMMA_SEPERATED_SYMBOLS") {
+        v.collect::<Vec<&str>>()
+            .iter()
+            .map(|v| v.to_string())
+            .collect()
     } else {
         fetch_symbols_retry(exchange, market_type)
     };
-    
+
     // let mut specified_symbols = Vec::new();
     // specified_symbols.push(args[5].as_str().to_string());
 
@@ -172,6 +201,7 @@ async fn main() {
         redis_url,
         data_deal_type,
         Some(&specified_symbols),
+        period.to_string(),
     )
     .await;
 }

@@ -13,10 +13,30 @@ fn main() {
 
 
     // 读取文件
-    if let Some(read_data) = ReadData::new("name".to_string(), "ydf".to_string(), 0) {
-        for data in read_data {
-            println!("{:?}", data);
-        }
-    }
+    // if let Some(read_data) = ReadData::new("binance_spot_candlestick_BTCUSDT_60".to_string(), 0) {
+    //     for data in read_data {
+            
+    //         let kline = decode_kline(data);
+    //         println!("{}", kline.json);
+    //         println!("{}", kline.symbol);
+    //         println!("{}", kline.close);
+    //         println!("{}", kline.high);
+    //         println!("{}", kline.open);
+    //         println!("{}", kline.msg_type);
+    //         println!("{}", kline.timestamp);
+
+    //     }
+    // }
+    // if let Some(read_data) = ReadData::new("binance_spot_bbo_BTCUSDT".to_string(), 0) {
+    //     for data in read_data {
+            
+    //         let bbo = decode_bbo(data);
+    //         println!("json {}", bbo.json);
+    //         println!("symol {}", bbo.symbol);
+    //         println!("msg_type {}", bbo.msg_type);
+    //         println!("timestamp {}", bbo.timestamp);
+
+    //     }
+    // }
 
 }

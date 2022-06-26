@@ -426,8 +426,8 @@ pub fn encode_orderbook(orderbook: &OrderBookMsg) -> Vec<i8> {
         MessageType::Candlestick => 9,
         MessageType::OpenInterest => 10,
         MessageType::FundingRate => 11,
-        // MessageType::LongShortRatio => 12,
-        // MessageType::TakerVolume => 12,
+        MessageType::LongShortRatio => 12,
+        MessageType::TakerVolume => 12,
     };
     orderbook_bytes.push(_message_type);
 

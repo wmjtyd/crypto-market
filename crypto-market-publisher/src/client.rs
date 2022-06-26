@@ -1,7 +1,6 @@
-#[macro_use]
 extern crate log;
 
-use std::net::ToSocketAddrs;
+use std::net::{ToSocketAddrs, SocketAddr};
 
 use ring::rand::*;
 
@@ -9,12 +8,12 @@ const MAX_DATAGRAM_SIZE: usize = 1350;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
-fn main() {
+pub fn start_client(addr: SocketAddr, taket_list: Vec<&str>) {
     let mut buf = [0; 65535];
     let mut out = [0; 1350];
 
 
-    let url_ptah = "http://127.0.0.1:4433".to_string();
+    let url_ptah = format!("http://{}", addr);
     let url = url::Url::parse(&url_ptah).unwrap();
 
     // Setup the event loop.
@@ -99,7 +98,6 @@ fn main() {
 
     let mut req_sent = false;
 
-    let mut index: usize = 1;
 
     loop {
         println!("{:?}", conn.timeout());
@@ -163,20 +161,15 @@ fn main() {
 
         // Send an HTTP request as soon as the connection is established.
         if conn.is_established() && !req_sent{
-            println!("sending HTTP request for {}", url.path());
-            match index {
-                1 => {conn.stream_send(HTTP_REQ_STREAM_ID, b"ADD test_data", true).unwrap();},
-                2 => {conn.stream_send(HTTP_REQ_STREAM_ID, "add aaa".as_bytes(), true).unwrap();},
-                3 => {conn.stream_send(HTTP_REQ_STREAM_ID, "add aaa".as_bytes(), true).unwrap();},
-                4 => {conn.stream_send(HTTP_REQ_STREAM_ID, "add aaa".as_bytes(), true).unwrap();},
-                5 => {conn.stream_send(HTTP_REQ_STREAM_ID, "rm aaa".as_bytes(), true).unwrap();},
-                6 => {conn.stream_send(HTTP_REQ_STREAM_ID, "rm bbb".as_bytes(), true).unwrap();},
-                7 => {conn.stream_send(HTTP_REQ_STREAM_ID, "rm ccc".as_bytes(), true).unwrap();},
-                _ => {conn.close(true, 0x00, b"test done").unwrap();}
+            println!("sending take {:?}", taket_list);
+            let mut data = Vec::new();
+            for take in &taket_list {
+                data.extend_from_slice(&format!("ADD {};", take).as_bytes());
             }
-            index += 1;
 
-            // let req = format!("aaa", url.path());
+            println!("{:?}", String::from_utf8(data[..data.len()-1].to_vec()));
+
+            conn.stream_send(HTTP_REQ_STREAM_ID, &data[..data.len()-1], true).unwrap();
             req_sent = true;
         }
 
@@ -189,17 +182,17 @@ fn main() {
 
                 let stream_buf = &buf[..read];
 
-                println!(
+                debug!(
                     "stream {} has {} bytes (fin? {})",
                     s,
                     stream_buf.len(),
                     fin
                 );
 
-                println!("r: -> {}", unsafe {
-                    std::str::from_utf8_unchecked(stream_buf)
-                });
+                
 
+
+                
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.
                 if s == HTTP_REQ_STREAM_ID && fin {

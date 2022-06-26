@@ -1,18 +1,11 @@
-use std::{
-    collections::{
-        HashMap,
-        HashSet
-    },
-    net,
-    sync::{Arc, Mutex, mpsc::{self, channel}},
-    thread, time::Duration, cell::RefCell, io::Read 
-};
+mod client;
+mod server;
+mod data;
 
-use mio::net::UdpSocket;
-use nanomsg::{Socket, Protocol};
-use ring::rand::SystemRandom;
+use std::net::SocketAddr;
 
-const MAX_DATAGRAM_SIZE: usize = 1350;
+use clap::{clap_app, ArgMatches};
+use server::create_server;
 
 #[macro_use]
 extern crate lazy_static;
@@ -20,144 +13,52 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
-type ClientList = HashMap<quiche::ConnectionId<'static>, Client>;
-type ClientTake = HashMap<String, HashSet<quiche::ConnectionId<'static>>>;
-type CLientChannelTake = ((String, String), quiche::ConnectionId<'static>);
+const MAX_DATAGRAM_SIZE: usize = 1350;
 
-lazy_static! {
-    static ref CLIENT_LIST: Mutex<ClientList> = {
-        let map: ClientList = HashMap::new();
-        Mutex::new(map)
+fn start_server(m: &ArgMatches) {
+    let addr: SocketAddr = if let Some(v) = m.value_of("ADDR") {
+        v.parse().unwrap()
+    } else {
+        "127.0.0.1:4433".parse().unwrap()
     };
 
-    static ref CLIENT_TAKE: Mutex<ClientTake> = {
-        let mut map: ClientTake = HashMap::new();
-
-        map.insert("data".to_string(), HashSet::new());
-
-
-        Mutex::new(map)
+    let crt = if let Some(path) = m.value_of("CRT") {
+        path.to_string()
+    } else {
+        "./examples/cert.crt".to_string()
     };
 
-    static ref CLIENT_QUIC_PACKAGE: ServerChannel<quiche::ConnectionId<'static>> = {
-        let c: ServerChannel<quiche::ConnectionId<'static>> = ServerChannel::new();
-        c
+    let key = if let Some(path) = m.value_of("KEY") {
+        path.to_string()
+    } else {
+        "./examples/cert.key".to_string()
     };
 
-    static ref SERVER_CHANNEL_TAKE: ServerTake  = {
-        let (send, revc) = mpsc::channel::<CLientChannelTake>();
-        ServerTake { 
-            send: Arc::new(Mutex::new(send)), 
-            recv: Arc::new(Mutex::new(revc))
-        }
+    let exchange = m.value_of("EXCHANGE").unwrap();
+    let market_type = m.value_of("MARKET_TYPE").unwrap();
+    let msg_type = m.value_of("MSG_TYPE").unwrap();
+    let data_deal_type = m.value_of("DATA_DEAL_TYPE").unwrap();
+    
+    let ipc = if let Some(period) = m.value_of("PERIOD") {
+        format!("{}_{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type, period)
+    } else {
+        format!("{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type)
     };
 
-    static ref SERVER: Server = {
-        let mut socket =  mio::net::UdpSocket::bind("127.0.0.1:4433".parse().unwrap()).unwrap();
-        let poll = mio::Poll::new().unwrap();
-        poll.registry()
-            .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
-            .unwrap();
+    debug!("ipc: {}", ipc);
 
-        Server { 
-            socket: Arc::new(socket), 
-            poll: Mutex::new(RefCell::new(poll)),
-        }
-    };
-}
-
-struct  ServerTake {
-    send: Arc<Mutex<mpsc::Sender<CLientChannelTake>>>,
-    recv: Arc<Mutex<mpsc::Receiver<CLientChannelTake>>>
-}
-
-
-struct ServerChannel <T>{
-    tx: Arc<Mutex<mpsc::Sender<T>>>,
-    rx: Arc<Mutex<mpsc::Receiver<T>>>
-}
-
-impl <T> ServerChannel <T> {
-    fn new() -> ServerChannel<T> {
-        let (tx, rx) = channel::<T>();
-        ServerChannel { 
-            tx: Arc::new(Mutex::new(tx)), 
-            rx: Arc::new(Mutex::new(rx)),
-        }
-    }
-}
-
-
-struct Server {
-    socket: Arc<UdpSocket>,
-    poll: Mutex<RefCell<mio::Poll>>,
-}
-
-impl Server {
-    pub fn event_poll(&self,  events: &mut mio::Events,  timeout: Option<Duration>) {
-        self.poll.lock().unwrap().get_mut().poll(events, timeout).unwrap();
-    }
-}
-
-
-struct PartialResponse {
-    body: Vec<u8>,
-    written: usize,
-}
-
-
-struct Client {
-    conn: quiche::Connection,
-    partial_responses: HashMap<u64, PartialResponse>,
-}
-
-
-#[tokio::main]
-async fn main() {
-    let mut service = Vec::new();
-
-    // 连接初始
-    service.push(thread::spawn(|| server_connection()));
-
-    // 订阅
-    service.push(thread::spawn(|| server_take()));
-
-    // 存活检查
-    service.push(thread::spawn(|| server_survive()));
-
-    // 发送
-    service.push(thread::spawn(|| server_distribute()));
-
-    // quic数据包
-    service.push(thread::spawn(|| server_quic_packets()));
-
-    for s in service {
-        s.join().unwrap();
-        break;
-    }
-}
-
-fn server_connection() -> ! {
-    let mut buf = [0; 65535];
-    let mut out = [0; MAX_DATAGRAM_SIZE];
-
-    let mut events = mio::Events::with_capacity(1024);
-
-    let socket = SERVER.socket.clone();
 
     let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
 
-    config
-        .load_cert_chain_from_pem_file("examples/cert.crt")
-        .unwrap();
-    config
-        .load_priv_key_from_pem_file("examples/cert.key")
-        .unwrap();
+    debug!("{} {}", crt, key);
 
     config
-        .set_application_protos(
-            b"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9",
-        )
+        .load_cert_chain_from_pem_file(&crt)
+        .unwrap();
+    config.load_priv_key_from_pem_file(&key).unwrap();
+
+    config
+        .set_application_protos(b"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9")
         .unwrap();
 
     config.set_max_idle_timeout(5000);
@@ -172,497 +73,81 @@ fn server_connection() -> ! {
     config.set_disable_active_migration(true);
     config.enable_early_data();
 
-    let rng = SystemRandom::new();
-    let conn_id_seed =
-        ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &rng).unwrap();
-    
-
-    println!("start server");
-    loop {
-        SERVER.event_poll(&mut events, None);
-        println!("event! --> {:?}", events);
-
-        'read: loop {
-            // If the event loop reported no events, it means that the timeout
-            // has expired, so handle it without attempting to read packets. We
-            // will then proceed with the send loop.
-            if events.is_empty() {
-                println!("timed out");
-                // clients.values_mut().for_each(|c| c.conn.on_timeout());
-                break 'read;
-            }
-
-            let mut clients_lock = CLIENT_LIST.lock().unwrap();
-
-            let (len, from) = match socket.recv_from(&mut buf) {
-                Ok(v) => v,
-
-                Err(e) => {
-                    // There are no more UDP packets to read, so end the read
-                    // loop.
-                    if e.kind() == std::io::ErrorKind::WouldBlock {
-                        println!("recv() would block");
-                        break 'read;
-                    }
-
-                    panic!("recv() failed: {:?}", e);
-                },
-            };
-
-            println!("got {} bytes", len);
-
-            let pkt_buf = &mut buf[..len];
-
-            // Parse the QUIC packet's header.
-            let hdr = match quiche::Header::from_slice(
-                pkt_buf,
-                quiche::MAX_CONN_ID_LEN,
-            ) {
-                Ok(v) => v,
-
-                Err(e) => {
-                    error!("Parsing packet header failed: {:?}", e);
-                    continue 'read;
-                },
-            };
-
-            println!("got packet {:?}", hdr);
-
-            let conn_id = ring::hmac::sign(&conn_id_seed, &hdr.dcid);
-            let conn_id = &conn_id.as_ref()[..quiche::MAX_CONN_ID_LEN];
-            let conn_id = conn_id.to_vec().into();
-
-            // Lookup a connection based on the packet's connection ID. If there
-            // is no connection matching, create a new one.
-            let (client, client_cid) = if !clients_lock.contains_key(&hdr.dcid) &&
-                !clients_lock.contains_key(&conn_id)
-            {
-                if hdr.ty != quiche::Type::Initial {
-                    error!("Packet is not Initial");
-                    continue 'read;
-                }
-
-                if !quiche::version_is_supported(hdr.version) {
-                    warn!("Doing version negotiation");
-
-                    let len =
-                        quiche::negotiate_version(&hdr.scid, &hdr.dcid, &mut out)
-                            .unwrap();
-
-                    let out = &out[..len];
-
-                    if let Err(e) = socket.send_to(out, from) {
-                        if e.kind() == std::io::ErrorKind::WouldBlock {
-                            println!("send() would block");
-                            break;
-                        }
-
-                        panic!("send() failed: {:?}", e);
-                    }
-                    continue 'read;
-                }
-
-                let mut scid = [0; quiche::MAX_CONN_ID_LEN];
-                scid.copy_from_slice(&conn_id);
-
-                let scid = quiche::ConnectionId::from_ref(&scid);
-
-                // Token is always present in Initial packets.
-                let token = hdr.token.as_ref().unwrap();
-
-                // Do stateless retry if the client didn't send a token.
-                if token.is_empty() {
-                    warn!("Doing stateless retry");
-
-                    let new_token = mint_token(&hdr, &from);
-
-                    let len = quiche::retry(
-                        &hdr.scid,
-                        &hdr.dcid,
-                        &scid,
-                        &new_token,
-                        hdr.version,
-                        &mut out,
-                    )
-                    .unwrap();
-
-                    let out = &out[..len];
-
-                    if let Err(e) = socket.send_to(out, from) {
-                        if e.kind() == std::io::ErrorKind::WouldBlock {
-                            println!("send() would block");
-                            break;
-                        }
-
-                        panic!("send() failed: {:?}", e);
-                    }
-                    continue 'read;
-                }
-
-                let odcid = validate_token(&from, token);
-
-                // The token was not valid, meaning the retry failed, so
-                // drop the packet.
-                if odcid.is_none() {
-                    error!("Invalid address validation token");
-                    continue 'read;
-                }
-
-                if scid.len() != hdr.dcid.len() {
-                    error!("Invalid destination connection ID");
-                    continue 'read;
-                }
-
-                // Reuse the source connection ID we sent in the Retry packet,
-                // instead of changing it again.
-                let scid = hdr.dcid.clone();
-
-                println!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
-
-                let conn =
-                    quiche::accept(&scid, odcid.as_ref(), from, &mut config)
-                        .unwrap();
-
-                let client = Client {
-                    conn,
-                    partial_responses: HashMap::new(),
-                };
-
-                clients_lock.insert(scid.clone(), client);
-                println!("insert");
-
-                (clients_lock.get_mut(&scid).unwrap(), scid.clone())
-            } else {
-                match clients_lock.get_mut(&hdr.dcid) {
-                    Some(v) => (v, hdr.dcid.clone()),
-
-                    None => (clients_lock.get_mut(&conn_id).unwrap(), conn_id.clone())
-                }
-            };
-
-            let recv_info = quiche::RecvInfo { from };
-
-            // Process potentially coalesced packets.
-            let read = match client.conn.recv(pkt_buf, recv_info) {
-                Ok(v) => v,
-
-                Err(e) => {
-                    error!("{} recv failed: {:?}", client.conn.trace_id(), e);
-                    continue 'read;
-                },
-            };
-            
-
-            println!("{} processed {} bytes", client.conn.trace_id(), read);
-
-            if client.conn.is_in_early_data() || client.conn.is_established() {
-                // Handle writable streams.
-                for stream_id in client.conn.writable() {
-                    handle_writable(client, stream_id);
-                }
-
-                // Process all readable streams.
-                for s in client.conn.readable() {
-                    while let Ok((read, fin)) =
-                        client.conn.stream_recv(s, &mut buf)
-                    {
-                        println!(
-                            "{} received {} bytes",
-                            client.conn.trace_id(),
-                            read
-                        );
-
-                        let stream_buf = &buf[..read];
-
-                        println!(
-                            "{} stream {} has {} bytes (fin? {})",
-                            client.conn.trace_id(),
-                            s,
-                            stream_buf.len(),
-                            fin
-                        );
-
-                        handle_stream(client, s, stream_buf, client_cid.clone());
-                    }
-                }
-            }
-            if let Ok(tx) = CLIENT_QUIC_PACKAGE.tx.lock() {
-                tx.send(client_cid.clone()).unwrap();
-            } 
-        }
-
-    }
+    create_server(addr, ipc, config);
 }
 
-fn server_take() -> ! {
-    loop {
-        let ((action, take_key), cid) = SERVER_CHANNEL_TAKE.recv.lock().unwrap().recv().unwrap();
-        let mut client_take_lock = CLIENT_TAKE.lock().unwrap();
-        let action = &action[..];
-        match action {
-            "ADD" => {
-                if let Some(v) = client_take_lock.get_mut(&take_key) {
-                    v.insert(cid);
-                } else {
-                    warn!("不存在的订阅");
-                }
-            }
-            "RM" => {
-                if let Some(v) = client_take_lock.get_mut(&take_key) {
-                    v.remove(&cid);
-                } else {
-                    warn!("不存在的订阅");
-                }
-            }
-            _ => continue
-        }
-    }
-}
-
-fn server_survive(){
-    loop {
-        thread::sleep(std::time::Duration::from_millis(2000));
-        let mut clients_lock = match CLIENT_LIST.lock() {
-            Ok(v) => v,
-            Err(_) => continue
-        };
-        let mut client_take_lock = match CLIENT_TAKE.lock() {
-            Ok(v) => v,
-            Err(_) => continue
-        };
-        
-
-
-        clients_lock.retain(|cid , ref mut c| {
-            debug!("Collecting garbage");
-
-            if c.conn.is_closed() {
-                info!(
-                    "{} connection collected {:?}",
-                    c.conn.trace_id(),
-                    c.conn.stats()
-                );
-                for cids in client_take_lock.values_mut() {
-                    cids.remove(&cid);
-                }
-            }
-
-            !c.conn.is_closed()
-        });
-    }
-}
-
-
-fn server_distribute(){
-
-    let url = "ipc:///tmp/test_data.ipc";
-    let take_list = vec!["data"];
-
-    for topic in take_list {
-        let topic = topic;
-        let url = url.to_string();
-        thread::spawn(move || {
-            let mut socket = Socket::new(Protocol::Sub).unwrap();
-            let setopt = socket.subscribe(topic.as_bytes());
-            let mut endpoint = socket.connect(&url).unwrap();
-        
-            match setopt {
-                Ok(_) => println!("Subscribed to '{:?}'.", topic),
-                Err(err) => println!("Client failed to subscribe '{}'.", err),
-            }
-        
-            let mut buf: Vec<u8> = Vec::new();
-            loop {
-                match socket.read_to_end(&mut buf) {
-                    Ok(buf_size) => {
-                        distribute(topic.to_string(), &buf[..buf_size]);
-                        buf.clear()
-                    }
-                    Err(err) => {
-                        println!("Client failed to receive msg '{}'.", err);
-                        break;
-                    }
-                }        
-            }
-            endpoint.shutdown().unwrap();
-        });
-    }
-}
-
-fn distribute(key: String, data: &[u8]) {
-    let socket = SERVER.socket.clone();
-    let client_take = match CLIENT_TAKE.lock() {
-        Ok(v) => v,
-        Err(_) => return,
-    };
-    let take = match client_take.get(&key) {
-        Some(v) => v,
-        None => return,
-    };
-    let mut clients = CLIENT_LIST.lock().unwrap();
-    let mut out = [0u8;1024];
-    for cid in take {
-        let client = clients.get_mut(&cid).unwrap();
-
-
-        if client.conn.is_established() {
-            // let stream_id = client.partial_responses.len() + 1;
-
-            // error: not writable
-            // if let Some(stream_id) = client.conn.writable().next() {
-            //     if let Err(e) = client.conn.stream_send(stream_id, &data, true) {
-            //         println!("error: {:?}", e);
-            //     };
-            // };
-
-            for stream_id in client.conn.writable() {
-                if let Err(e) = client.conn.stream_send(stream_id, &data, false) {
-                    println!("error: {:?}", e);
-                };
-            }
-
-            send(client, socket.clone(), &mut out);
-        }
-        
-    }
-}
-
-fn server_quic_packets() -> ! {
-    let rx = CLIENT_QUIC_PACKAGE.rx.lock().unwrap();
-    let socket = SERVER.socket.clone();
-    let mut out = [0u8;1024];
-
-    loop {
-        if let Ok(cid) = rx.recv() {
-            if let Ok(mut clients) = CLIENT_LIST.lock() {
-                if let Some(client) = clients.get_mut(&cid) {
-                    send(client, socket.clone(), &mut out);
-                }
-            }
-        }
-    }
-}
-
-
-fn send(client: &mut Client, socket: Arc<UdpSocket>, out: &mut [u8]){
-    loop {
-        let (write, send_info) = match client.conn.send(out) {
-            Ok(v) => v,
-
-            Err(quiche::Error::Done) => {
-                debug!("{} done writing", client.conn.trace_id());
-                break;
-            },
-
-            Err(e) => {
-                error!("{} send failed: {:?}", client.conn.trace_id(), e);
-
-                client.conn.close(false, 0x1, b"fail").ok();
-                break;
-            },
-        };
-
-        if let Err(e) = socket.send_to(&out[..write], send_info.to) {
-            if e.kind() == std::io::ErrorKind::WouldBlock {
-                println!("send() would block");
-                break;
-            }
-
-            panic!("send() failed: {:?}", e);
-        }
-
-        debug!("{} written {} bytes", client.conn.trace_id(), write);
-    }
-}
-
-fn validate_token<'a>(
-    src: &net::SocketAddr, token: &'a [u8],
-) -> Option<quiche::ConnectionId<'a>> {
-    if token.len() < 6 {
-        return None;
-    }
-
-    if &token[..6] != b"quiche" {
-        return None;
-    }
-
-    let token = &token[6..];
-
-    let addr = match src.ip() {
-        std::net::IpAddr::V4(a) => a.octets().to_vec(),
-        std::net::IpAddr::V6(a) => a.octets().to_vec(),
-    };
-
-    if token.len() < addr.len() || &token[..addr.len()] != addr.as_slice() {
-        return None;
-    }
-
-    Some(quiche::ConnectionId::from_ref(&token[addr.len()..]))
-}
-
-fn mint_token(hdr: &quiche::Header, src: &net::SocketAddr) -> Vec<u8> {
-    let mut token = Vec::new();
-
-    token.extend_from_slice(b"quiche");
-
-    let addr = match src.ip() {
-        std::net::IpAddr::V4(a) => a.octets().to_vec(),
-        std::net::IpAddr::V6(a) => a.octets().to_vec(),
-    };
-
-    token.extend_from_slice(&addr);
-    token.extend_from_slice(&hdr.dcid);
-
-    token
-}
-
-fn handle_writable(client: &mut Client, stream_id: u64) {
-    let conn = &mut client.conn;
-
-    debug!("{} stream {} is writable", conn.trace_id(), stream_id);
-
-    if !client.partial_responses.contains_key(&stream_id) {
-        return;
-    }
-
-    let resp = client.partial_responses.get_mut(&stream_id).unwrap();
-    let body = &resp.body[resp.written..];
-
-    let written = match conn.stream_send(stream_id, body, true) {
-        Ok(v) => v,
-
-        Err(quiche::Error::Done) => 0,
-
-        Err(e) => {
-            client.partial_responses.remove(&stream_id);
-
-            error!("{} stream send failed {:?}", conn.trace_id(), e);
-            return;
-        },
-    };
-
-    resp.written += written;
-
-    if resp.written == resp.body.len() {
-        client.partial_responses.remove(&stream_id);
-    }
-}
-
-fn handle_stream(_client: &mut Client, _stream_id: u64, buf: &[u8], cid: quiche::ConnectionId<'static>) {
-    let command = if let Ok(v) = String::from_utf8(buf.to_vec()) {
-        v
+fn start_client(m: &ArgMatches) {
+    let addr: SocketAddr = if let Some(v) = m.value_of("ADDR") {
+        v.parse().expect("addr input error")
     } else {
-        return;
+        "127.0.0.1:4433".parse().unwrap()
     };
 
-    if let Some(num) = command.find(" ") {
-        let data = (
-            (
-                command[..num].to_string(), 
-                command[num+1..].to_string()
-            ), 
-            cid.clone());
-        let send_lock = SERVER_CHANNEL_TAKE.send.lock().unwrap();
-        send_lock.send(data).unwrap();
-    }
+    let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
+
+    let exchange = m.value_of("EXCHANGE").unwrap();
+    let market_type = m.value_of("MARKET_TYPE").unwrap();
+    let msg_type = m.value_of("MSG_TYPE").unwrap();
+    let data_deal_type = m.value_of("DATA_DEAL_TYPE").unwrap();
+    
+    let ipc = if let Some(period) = m.value_of("PERIOD") {
+        format!("{}_{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type, period)
+    } else {
+        format!("{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type)
+    };
+
+
+    // *CAUTION*: this should not be set to `false` in production!!!
+    config.verify_peer(false);
+
+    config
+        .set_application_protos(b"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9")
+        .unwrap();
+
+    config.set_max_idle_timeout(5000);
+    config.set_max_recv_udp_payload_size(MAX_DATAGRAM_SIZE);
+    config.set_max_send_udp_payload_size(MAX_DATAGRAM_SIZE);
+    config.set_initial_max_data(10_000_000);
+    config.set_initial_max_stream_data_bidi_local(1_000_000);
+    config.set_initial_max_stream_data_bidi_remote(1_000_000);
+    config.set_initial_max_streams_bidi(100);
+    config.set_initial_max_streams_uni(100);
+    config.set_disable_active_migration(true);
+
+    client::start_client(addr, vec![ipc.as_str()]);
+}
+
+#[tokio::main]
+async fn main() {
+    env_logger::init().unwrap();
+    let matches: clap::ArgMatches = clap_app!(quic =>
+        (@subcommand server =>
+            (about: "start server")
+            (@arg ADDR: +required "ip addr")
+            (@arg EXCHANGE:     +required "exchange")
+            (@arg MARKET_TYPE:  +required "market_type")
+            (@arg MSG_TYPE:     +required "msg_type")
+            (@arg DATA_DEAL_TYPE: +required "data_deal_type")
+            (@arg PERIOD: "period")
+            (@arg CRT: -c --crt +takes_value "ctr file path")
+            (@arg KEY: -k --key +takes_value "key file path")
+        )
+        (@subcommand client =>
+            (about: "use client")
+            (@arg ADDR:         +required "ip addr")
+            (@arg EXCHANGE:     +required "exchange")
+            (@arg MARKET_TYPE:  +required "market_type")
+            (@arg MSG_TYPE:     +required "msg_type")
+            (@arg DATA_DEAL_TYPE: +required "data_deal_type")
+            (@arg PERIOD: "period")
+        )
+
+    )
+    .get_matches();
+
+    match matches.subcommand() {
+        ("server", m) => start_server(m.unwrap()),
+        ("client", m) => start_client(m.unwrap()),
+        _ => {}
+    };
 }
