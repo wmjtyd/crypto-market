@@ -245,9 +245,8 @@ async fn create_nanomsg_writer_thread(
 
 pub fn create_writer_threads(
     rx: Receiver<Message>,
-    data_dir: Option<String>,
-    redis_url: Option<String>,
-    data_deal_type: &str,
+    _data_dir: Option<String>,
+    _redis_url: Option<String>,
     exchange: &'static str,
     market_type: MarketType,
     msg_type: MessageType,

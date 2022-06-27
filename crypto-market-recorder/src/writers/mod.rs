@@ -40,7 +40,7 @@ pub async fn create_write_file_thread(
             match read_result {
                 Ok(_size) => {
                     let data = unsafe {std::mem::transmute::<Vec<u8>, Vec<i8>>(payload)};
-                    write_data.add_order_book(ipc.to_string(), data);
+                    write_data.add(ipc.to_string(), data);
                 }
                 Err(err) => {
                     error!("Client failed to receive payload '{}'.", err);

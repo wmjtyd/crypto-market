@@ -13,7 +13,6 @@ pub async fn crawl(
     msg_type: MessageType,
     data_dir: Option<String>,
     redis_url: Option<String>,
-    data_deal_type: &str,
     symbols: Option<&[String]>,
     period: String,
 ) {
@@ -33,7 +32,6 @@ pub async fn crawl(
             rx,
             data_dir,
             redis_url,
-            &data_deal_type,
             exchange,
             market_type,
             msg_type,
@@ -119,7 +117,6 @@ async fn main() {
             (@arg EXCHANGE:     +required "exchange")
             (@arg MARKET_TYPE:  +required "market_type")
             (@arg MSG_TYPE:     +required "msg_type")
-            (@arg DATA_DEAL_TYPE: +required "data_deal_type")
             (@arg PERIOD: "period")
             (@arg COMMA_SEPERATED_SYMBOLS: -c --comma_seperated_symbols +use_delimiter "comma_seperated_symbols")
     )
@@ -147,7 +144,6 @@ async fn main() {
     }
     let msg_type = msg_type.unwrap();
 
-    let data_deal_type = matches.value_of("DATA_DEAL_TYPE").unwrap();
 
     let data_dir = if std::env::var("DATA_DIR").is_err() {
         info!("The DATA_DIR environment variable does not exist");
@@ -199,7 +195,6 @@ async fn main() {
         msg_type,
         data_dir,
         redis_url,
-        data_deal_type,
         Some(&specified_symbols),
         period.to_string(),
     )
