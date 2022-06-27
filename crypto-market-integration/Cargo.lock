@@ -27,6 +27,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_term"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
+
+[[package]]
 name = "anyhow"
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -120,6 +126,12 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bitflags"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4efd02e230a02e18f92fc2735f44597385ed02ad8f831e7c1c1156ee5e1ab3a5"
+
+[[package]]
+name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
@@ -167,10 +179,11 @@ name = "carbonbot"
 version = "2.11.2"
 dependencies = [
  "chrono",
+ "clap",
  "crypto-crawler",
  "crypto-market-type",
  "crypto-markets",
- "crypto-msg-parser",
+ "crypto-msg-parser 2.4.12",
  "crypto-msg-type",
  "crypto-pair",
  "crypto-rest-client",
@@ -224,12 +237,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap"
+version = "2.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b8c532887f1a292d17de05ae858a8fe50a301e196f9ef0ddb7ccd0d1d00f180"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "bitflags 0.9.1",
+ "strsim",
+ "textwrap",
+ "unicode-width",
+ "vec_map",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -383,14 +411,14 @@ dependencies = [
 
 [[package]]
 name = "crypto-contract-value"
-version = "1.4.0"
+version = "1.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6441f070c6bb9732d21498e19a881a9ba3ac57202cadfaa291367ce423912185"
+checksum = "610c8ffa456d7621f5e10dc1d093fb3bc07fca9740a647d940a28dde25cf4343"
 dependencies = [
  "crypto-market-type",
  "crypto-pair",
  "once_cell",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
  "serde",
  "serde_json",
 ]
@@ -403,7 +431,7 @@ checksum = "0ee1cc3ef670b2c8a3743611412f73d47a241640ae76548a93efe2e926cc0f5a"
 dependencies = [
  "crypto-market-type",
  "crypto-markets",
- "crypto-msg-parser",
+ "crypto-msg-parser 2.3.0",
  "crypto-msg-type",
  "crypto-pair",
  "crypto-rest-client",
@@ -412,7 +440,7 @@ dependencies = [
  "log",
  "once_cell",
  "rand 0.8.5",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
  "serde",
  "serde_json",
  "tokio 1.19.1",
@@ -438,7 +466,7 @@ dependencies = [
  "chrono",
  "crypto-market-type",
  "crypto-pair",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
  "serde",
  "serde_json",
 ]
@@ -456,7 +484,27 @@ dependencies = [
  "crypto-pair",
  "if_chain",
  "once_cell",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
+ "serde",
+ "serde_json",
+ "simple-error",
+ "strum",
+ "strum_macros",
+]
+
+[[package]]
+name = "crypto-msg-parser"
+version = "2.4.12"
+source = "git+https://github.com/wmjtyd/crypto-crawler-rs#576d0236ce0257fd60200a998df52fc04d1b9643"
+dependencies = [
+ "chrono",
+ "crypto-contract-value",
+ "crypto-market-type",
+ "crypto-msg-type",
+ "crypto-pair",
+ "if_chain",
+ "once_cell",
+ "reqwest 0.11.11",
  "serde",
  "serde_json",
  "simple-error",
@@ -466,9 +514,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-msg-type"
-version = "1.0.6"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72a225ae99439b5a8bed3d75fcaa1a718e51d5081baaa979c815b6ff0281ddae"
+checksum = "37a5e0fc3bbf444ab14af8db15215eb65846830ee5871d5e4bf585dd5cf1c21f"
 dependencies = [
  "serde",
  "serde_json",
@@ -478,13 +526,13 @@ dependencies = [
 
 [[package]]
 name = "crypto-pair"
-version = "2.2.7"
+version = "2.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b40c5b0fe021fa3942373952b7fc70aa60c42cac726263e62eca5b78ec07e28"
+checksum = "e12b8c27f6614f1460320625caa2770c903d5e53e30465056ea5921d9ef01687"
 dependencies = [
  "crypto-market-type",
  "once_cell",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
  "serde",
  "serde_json",
 ]
@@ -499,7 +547,7 @@ dependencies = [
  "log",
  "once_cell",
  "regex",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
  "serde",
  "serde_json",
 ]
@@ -517,7 +565,7 @@ dependencies = [
  "governor",
  "log",
  "nonzero_ext",
- "reqwest 0.11.10",
+ "reqwest 0.11.11",
  "serde_json",
  "tokio 1.19.1",
  "tokio-tungstenite",
@@ -695,7 +743,7 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e9763c69ebaae630ba35f74888db465e49e259ba1bc0eda7d06f4a067615d82"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "fuchsia-zircon-sys",
 ]
 
@@ -899,7 +947,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio 1.19.1",
- "tokio-util 0.7.3",
+ "tokio-util",
  "tracing",
 ]
 
@@ -1429,7 +1477,7 @@ version = "0.10.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb81a6430ac911acb25fe5ac8f1d2af1b4ea8a4fdfda0f1ee4292af2e2d8eb0e"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "cfg-if 1.0.0",
  "foreign-types",
  "libc",
@@ -1799,7 +1847,7 @@ version = "10.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "738bc47119e3eeccc7e94c4a506901aea5e7b4944ecd0829cbebf4af04ceda12"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -1838,7 +1886,7 @@ version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62f25bc4c7e55e0b0b7a1d43fb893f4fa1361d0abe38b9ce4f323c2adfe6ef42"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -1914,9 +1962,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.10"
+version = "0.11.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46a1f7aa4f35e5e8b4160449f51afc758f0ce6454315a9fa7d0d113e958c41eb"
+checksum = "b75aa69a3f06bbcc66ede33af2af253c6f7a86b1ca0033f60c580a27074fbf92"
 dependencies = [
  "async-compression",
  "base64 0.13.0",
@@ -1943,7 +1991,8 @@ dependencies = [
  "tokio 1.19.1",
  "tokio-native-tls",
  "tokio-socks",
- "tokio-util 0.6.10",
+ "tokio-util",
+ "tower-service",
  "url 2.2.2",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2079,7 +2128,7 @@ version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dc14f172faf8a0194a3aded622712b0de276821addc574fa54fc0a1167e10dc"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "core-foundation",
  "core-foundation-sys",
  "libc",
@@ -2287,10 +2336,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "strum"
-version = "0.24.0"
+name = "strsim"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e96acfc1b70604b8b2f1ffa4c57e59176c7dbb05d556c71ecd2f5498a1dee7f8"
+checksum = "b4d15c810519a91cf877e7e36e63fe068815c678181439f2f29e2562147c3694"
+
+[[package]]
+name = "strum"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 
 [[package]]
 name = "strum_macros"
@@ -2349,6 +2404,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "textwrap"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0b59b6b4b44d867f1370ef1bd91bfb262bf07bf0ae65c202ea2fbc16153b693"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]
@@ -2621,20 +2685,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36943ee01a6d67977dd3f84a5a1d2efeb4ada3a1ae771cadfaa535d9d9fc6507"
-dependencies = [
- "bytes 1.1.0",
- "futures-core",
- "futures-sink",
- "log",
- "pin-project-lite",
- "tokio 1.19.1",
-]
-
-[[package]]
-name = "tokio-util"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc463cd8deddc3770d20f9852143d50bf6094e640b485cb2e189a2099085ff45"
@@ -2746,6 +2796,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unicode-width"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
+
+[[package]]
 name = "unicode-xid"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2810,6 +2866,12 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "vec_map"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "version_check"

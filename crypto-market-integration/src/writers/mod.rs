@@ -107,9 +107,9 @@ async fn create_nanomsg_writer_thread(
             let msg_r = msg.clone();
             match msg_type {
                 MessageType::BBO => {
-                    let received_at = 1651122265862;
+                    let received_at = msg_r.received_at;
                     let bbo_msg = tokio::task::spawn_blocking(move || {
-                        parse_bbo(exchange, MarketType::Spot, &msg_r.json, Some(received_at)).unwrap()
+                        parse_bbo(exchange, MarketType::Spot, &msg_r.json, Some(received_at as i64)).unwrap()
                     })
                     .await
                     .unwrap();

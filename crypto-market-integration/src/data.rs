@@ -10,6 +10,7 @@ pub static EXANGE: phf::Map<&'static str, u8> = phf_map! {
     "ftx" => 2,
     "binance" => 3,
     "huobi" => 8,
+    "kucoin" => 10,
     "okx" => 11,
 };
 
@@ -500,7 +501,8 @@ fn decode_orderbook(payload: Vec<i8>) -> OrderBookMsg {
         1 => "crypto",
         2 => "ftx",
         3 => "binance",
-        3 => "huobi",
+        8 => "huobi",
+        10 => "kucoin",
         11 => "okx",
         _ => "unknow",
     };
@@ -747,7 +749,7 @@ fn decode_trade(payload: Vec<i8>) -> TradeMsg {
         1 => "crypto",
         2 => "ftx",
         3 => "binance",
-        3 => "huobi",
+        8 => "huobi",
         11 => "okx",
         _ => "unknow",
     };

@@ -22,8 +22,6 @@ pub async fn crawl(
     // }
     let (tx, rx) = std::sync::mpsc::channel::<Message>();
 
-    let data_deal_type = data_deal_type.to_string();
-
     let period = Arc::new(period);
 
     let period_arc = period.clone();
