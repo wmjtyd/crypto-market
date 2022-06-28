@@ -26,7 +26,7 @@ impl WriteData {
         }
     }
 
-    pub fn add_order_book(&mut self, filename: String, array: Vec<i8>) {
+    pub fn add(&mut self, filename: String, array: Vec<i8>) {
         self.channel_sender
             .send((filename, array))
             .expect("文件数据信道出现问题")

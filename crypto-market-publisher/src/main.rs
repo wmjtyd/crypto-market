@@ -1,6 +1,5 @@
 mod client;
 mod server;
-mod data;
 
 use std::net::SocketAddr;
 

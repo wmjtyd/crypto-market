@@ -107,9 +107,9 @@ async fn create_nanomsg_writer_thread(
             let msg_r = msg.clone();
             match msg_type {
                 MessageType::BBO => {
-                    let received_at = 1651122265862;
+                    let received_at = msg_r.received_at;
                     let bbo_msg = tokio::task::spawn_blocking(move || {
-                        parse_bbo(exchange, MarketType::Spot, &msg_r.json, Some(received_at)).unwrap()
+                        parse_bbo(exchange, MarketType::Spot, &msg_r.json, Some(received_at as i64)).unwrap()
                     })
                     .await
                     .unwrap();
@@ -245,9 +245,8 @@ async fn create_nanomsg_writer_thread(
 
 pub fn create_writer_threads(
     rx: Receiver<Message>,
-    data_dir: Option<String>,
-    redis_url: Option<String>,
-    data_deal_type: &str,
+    _data_dir: Option<String>,
+    _redis_url: Option<String>,
     exchange: &'static str,
     market_type: MarketType,
     msg_type: MessageType,
