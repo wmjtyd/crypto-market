@@ -11,13 +11,13 @@ use axum::{
 };
 use crypto_crawler::{MarketType, Message, MessageType};
 
+use chrono::{DateTime, Local, TimeZone, Timelike, Utc, Duration};
 use crypto_msg_parser::parse_l2_topk;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
-use websocket::{init_config, config::config::ApplicationConfig};
-use std::sync::Mutex;
+use std::{sync::Mutex, ops::Add};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -25,8 +25,7 @@ use std::{
 };
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
-use chrono::{DateTime, Local, Utc, TimeZone, Timelike};
-
+use websocket::{config::config::ApplicationConfig, init_config};
 
 #[tokio::main]
 async fn main() {
@@ -35,6 +34,7 @@ async fn main() {
     }
     tracing_subscriber::fmt::init();
     let application_config = init_config().await;
+    let port = application_config.port;
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/file", post(handler))
@@ -45,10 +45,9 @@ async fn main() {
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
         )
         .layer(Extension(Arc::new(AppState::default())))
-        .layer(Extension(application_config))
-        ;
+        .layer(Extension(application_config));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -66,16 +65,21 @@ async fn ws_handler(
         println!("`{}` connected", user_agent.as_str());
     }
 
-    ws.on_upgrade(|socket| handle_socket(socket, state,application_config))
+    ws.on_upgrade(|socket| handle_socket(socket, state, application_config))
 }
 
-async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>,application_config:ApplicationConfig) {
+async fn handle_socket(
+    mut socket: WebSocket,
+    state: Arc<AppState>,
+    application_config: ApplicationConfig,
+) {
     loop {
         if let Some(msg) = socket.recv().await {
             if let Ok(msg) = msg {
                 match msg {
                     RawMessage::Text(t) => {
                         let actions = processing_requests(&t, &state).await;
+                        socket.send(RawMessage::Text(actions)).await.unwrap();
                     }
                     RawMessage::Binary(_) => {
                         println!("client sent binary data");
@@ -96,46 +100,79 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>,application_c
                 return;
             }
         }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }
 
-pub async fn handler(Json(params): Json<Params>,Extension(application_config): Extension<ApplicationConfig>) -> impl IntoResponse {
+pub async fn handler(
+    Json(params): Json<Params>,
+    Extension(application_config): Extension<ApplicationConfig>,
+) -> impl IntoResponse {
     //Todo: 从配置文件读取配置
-    let src = application_config.record_dir+"/" + &filename(&params);
-    let file = match tokio::fs::File::open("data.txt").await {
+    let src = application_config.record_dir + "/" + &filename(&params)[0];
+
+    // let  mut stream = ReaderStream::new(File::open("./data.csv").await.unwrap());
+
+    // //Todo: 同时返回多个文件
+    // let path = application_config.record_dir;
+    // for file in filename(&params) {
+    //     let src = path.clone() + "/" + &file;
+    //     let file = match tokio::fs::File::open(src).await {
+    //         Ok(file) => file,
+    //         Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
+    //     };
+    //     let stream = ReaderStream::new(file);
+    //     let body = StreamBody::new(stream);
+
+    // }
+    // let headers = Headers([
+    //     (header::CONTENT_TYPE, "text/toml; charset=utf-8"),
+    //     (header::CONTENT_DISPOSITION, "attachment; filename=\"data\""),
+    // ]);
+    // let result: StreamBody<ReaderStream<File>> = StreamBody::new(stream);
+
+
+    let file = match tokio::fs::File::open(src).await {
         Ok(file) => file,
         Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
     };
     let stream = ReaderStream::new(file);
     let body = StreamBody::new(stream);
-
     let headers = Headers([
         (header::CONTENT_TYPE, "text/toml; charset=utf-8"),
-        (
-            header::CONTENT_DISPOSITION,
-            "attachment; filename=\"Cargo.toml\"",
-        ),
+        (header::CONTENT_DISPOSITION, "attachment; filename=\"data\""),
     ]);
 
     Ok((headers, body))
 }
 
-pub fn filename(params: &Params) -> String {
+pub fn filename(params: &Params) -> Vec<String> {
+    let mut files = Vec::new();
     let exchange = &params.exchange;
     let market_type = &params.market_type;
     let msg_type = &params.msg_type;
     let symbol = &params.symbols;
-    let dt = Utc.timestamp(params.begin_datetime, 0);
-    let datetime =format!("{}", dt.format("%Y%m%d"));
-    let ipc = if let Some(period) = &params.period {
-        format!(
-            "{}_{}_{}_{}_{}",
-            exchange, market_type, msg_type, symbol, period
-        )
-    } else {
-        format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
-    };
-    format!("{}/{}", datetime, ipc)
+    let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
+    let end_datetime = Utc.timestamp(params.end_datetime, 0);
+    let days = (end_datetime - begin_datetime).num_days();
+
+    let mut datetime = format!("{}", begin_datetime.format("%Y%m%d"));
+    //循环
+    for i in 0..days {
+        let ipc = if let Some(period) = &params.period {
+            format!(
+                "{}_{}_{}_{}_{}",
+                exchange, market_type, msg_type, symbol, period
+            )
+        } else {
+            format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
+        };
+        let filename = format!("{}/{}", datetime, ipc);
+        files.push(filename);
+        begin_datetime=begin_datetime.add(Duration::days(1));
+        datetime = format!("{}", begin_datetime.format("%Y%m%d"));
+    }
+    files
 }
 
 #[derive(Deserialize)]
@@ -162,6 +199,7 @@ pub struct AppState {
 pub async fn processing_requests(str: &str, state: &AppState) -> String {
     let params: Action = serde_json::from_str(str).unwrap();
     if let Some(echo) = params.echo {
+        let mut result = String::new();
         let receiver = state.receiver.clone();
         tokio::task::spawn_blocking(move || {
             let locked = receiver.lock().unwrap();
@@ -171,13 +209,15 @@ pub async fn processing_requests(str: &str, state: &AppState) -> String {
                 let received_at = msg.received_at as i64;
 
                 let orderbook = parse_l2_topk(
-                    "binance",
+                    params.params["symbol"].as_str().unwrap(),
                     MarketType::Spot,
                     &(msg as Message).json,
                     Some(received_at),
                 )
                 .unwrap();
                 let orderbook = &orderbook[0];
+                result.clone().push_str(&json!(orderbook).to_string());
+                break;
             }
         })
         .await

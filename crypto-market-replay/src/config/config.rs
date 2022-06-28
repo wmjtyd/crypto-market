@@ -9,6 +9,8 @@ pub struct ApplicationConfig {
     pub server:ServerConfig,
     ///数据库
     pub record_dir: String,
+
+    pub port: u16,
 }
 
 impl ApplicationConfig {
