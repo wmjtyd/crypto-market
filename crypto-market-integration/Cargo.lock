@@ -175,37 +175,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
-name = "carbonbot"
-version = "2.11.2"
-dependencies = [
- "chrono",
- "clap",
- "crypto-crawler",
- "crypto-market-type",
- "crypto-markets",
- "crypto-msg-parser 2.4.12",
- "crypto-msg-type",
- "crypto-pair",
- "crypto-rest-client",
- "crypto-ws-client",
- "env_logger",
- "futures 0.3.21",
- "lazy_static",
- "log",
- "nanomsg",
- "openssl",
- "phf",
- "redis",
- "reopen",
- "rust_decimal",
- "rust_decimal_macros",
- "serde_json",
- "signal-hook",
- "slack-hook",
- "tokio 1.19.1",
-]
-
-[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -443,6 +412,37 @@ dependencies = [
  "reqwest 0.11.11",
  "serde",
  "serde_json",
+ "tokio 1.19.1",
+]
+
+[[package]]
+name = "crypto-market-integration"
+version = "2.11.2"
+dependencies = [
+ "chrono",
+ "clap",
+ "crypto-crawler",
+ "crypto-market-type",
+ "crypto-markets",
+ "crypto-msg-parser 2.4.12",
+ "crypto-msg-type",
+ "crypto-pair",
+ "crypto-rest-client",
+ "crypto-ws-client",
+ "env_logger",
+ "futures 0.3.21",
+ "lazy_static",
+ "log",
+ "nanomsg",
+ "openssl",
+ "phf",
+ "redis",
+ "reopen",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde_json",
+ "signal-hook",
+ "slack-hook",
  "tokio 1.19.1",
 ]
 
