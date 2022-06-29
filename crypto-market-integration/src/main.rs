@@ -3,6 +3,7 @@ use clap::clap_app;
 use crypto_crawler::*;
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
+use futures::Future;
 use log::*;
 use redis::IntoConnectionInfo;
 use std::{env, str::FromStr, sync::Arc};
@@ -59,10 +60,14 @@ pub async fn crawl(
     } else {
         match msg_type {
             MessageType::BBO => {
-                crawl_bbo(exchange, market_type, symbols, tx).await;
+                reload_loop(async move {
+                    crawl_bbo(exchange, market_type, symbols, tx).await;
+                }).await
             }
             MessageType::Trade => {
-                crawl_trade(exchange, market_type, symbols, tx).await;
+                reload_loop(async move {
+                    crawl_trade(exchange, market_type, symbols, tx).await;
+                }).await
             }
             MessageType::L2Event => {
                 crawl_l2_event(exchange, market_type, symbols, tx).await;
@@ -104,6 +109,10 @@ pub async fn crawl(
             _ => panic!("Not implemented"),
         };
     }
+}
+
+async fn reload_loop(func: impl Future<Output = ()>) {
+    func.await;
 }
 
 #[tokio::main(flavor = "multi_thread")]
