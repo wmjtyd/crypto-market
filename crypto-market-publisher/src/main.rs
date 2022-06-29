@@ -21,31 +21,22 @@ fn start_server(m: &ArgMatches) {
         "127.0.0.1:4433".parse().unwrap()
     };
 
-    let crt = if let Some(path) = m.value_of("CRT") {
-        path.to_string()
-    } else {
-        "./examples/cert.crt".to_string()
-    };
+    let crt = 
+        m.value_of("CRT").unwrap_or("./examples/cert.crt");
 
-    let key = if let Some(path) = m.value_of("KEY") {
-        path.to_string()
-    } else {
-        "./examples/cert.key".to_string()
-    };
+    let key = 
+        m.value_of("KEY").unwrap_or("./examples/cert.key");
 
     let exchange = m.value_of("EXCHANGE").unwrap();
     let market_type = m.value_of("MARKET_TYPE").unwrap();
     let msg_type = m.value_of("MSG_TYPE").unwrap();
-    let data_deal_type = m.value_of("DATA_DEAL_TYPE").unwrap();
     
     let ipc = if let Some(period) = m.value_of("PERIOD") {
-        format!("{}_{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type, period)
+        format!("{}_{}_{}_{}", exchange, market_type, msg_type, period)
     } else {
-        format!("{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type)
+        format!("{}_{}_{}", exchange, market_type, msg_type)
     };
-
     debug!("ipc: {}", ipc);
-
 
     let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
 
@@ -54,7 +45,8 @@ fn start_server(m: &ArgMatches) {
     config
         .load_cert_chain_from_pem_file(&crt)
         .unwrap();
-    config.load_priv_key_from_pem_file(&key).unwrap();
+    config.load_priv_key_from_pem_file(&key)
+        .unwrap();
 
     config
         .set_application_protos(b"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9")
@@ -87,13 +79,14 @@ fn start_client(m: &ArgMatches) {
     let exchange = m.value_of("EXCHANGE").unwrap();
     let market_type = m.value_of("MARKET_TYPE").unwrap();
     let msg_type = m.value_of("MSG_TYPE").unwrap();
-    let data_deal_type = m.value_of("DATA_DEAL_TYPE").unwrap();
     
     let ipc = if let Some(period) = m.value_of("PERIOD") {
-        format!("{}_{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type, period)
+        format!("{}_{}_{}_{}", exchange, market_type, msg_type, period)
     } else {
-        format!("{}_{}_{}_{}", exchange, market_type, msg_type, data_deal_type)
+        format!("{}_{}_{}", exchange, market_type, msg_type)
     };
+
+    let subscribe_list = vec![ipc.as_str()];
 
 
     // *CAUTION*: this should not be set to `false` in production!!!
@@ -113,7 +106,14 @@ fn start_client(m: &ArgMatches) {
     config.set_initial_max_streams_uni(100);
     config.set_disable_active_migration(true);
 
-    client::start_client(addr, vec![ipc.as_str()]);
+    let rx = client::start_client(
+        addr,
+        config, 
+        subscribe_list);
+    for _i in rx.iter() {
+        // decode space
+        
+    }
 }
 
 #[tokio::main]
@@ -126,7 +126,6 @@ async fn main() {
             (@arg EXCHANGE:     +required "exchange")
             (@arg MARKET_TYPE:  +required "market_type")
             (@arg MSG_TYPE:     +required "msg_type")
-            (@arg DATA_DEAL_TYPE: +required "data_deal_type")
             (@arg PERIOD: "period")
             (@arg CRT: -c --crt +takes_value "ctr file path")
             (@arg KEY: -k --key +takes_value "key file path")
@@ -137,10 +136,8 @@ async fn main() {
             (@arg EXCHANGE:     +required "exchange")
             (@arg MARKET_TYPE:  +required "market_type")
             (@arg MSG_TYPE:     +required "msg_type")
-            (@arg DATA_DEAL_TYPE: +required "data_deal_type")
             (@arg PERIOD: "period")
         )
-
     )
     .get_matches();
 

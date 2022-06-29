@@ -4,7 +4,7 @@ use std::{
     io::Read,
     net::{self, SocketAddr},
     sync::{
-        mpsc::{self, channel},
+        mpsc,
         Arc, Mutex,
     },
     thread,
@@ -23,25 +23,21 @@ extern crate lazy_static;
 extern crate log;
 
 type ClientList = HashMap<quiche::ConnectionId<'static>, Client>;
-type ClientTake = HashMap<String, HashSet<quiche::ConnectionId<'static>>>;
-type CLientChannelTake = ((String, String), quiche::ConnectionId<'static>);
+type ClientSubscribe = HashMap<String, HashSet<quiche::ConnectionId<'static>>>;
+type CLientChannelSubscribe = ((String, String), quiche::ConnectionId<'static>);
 
 lazy_static! {
     static ref CLIENT_LIST: Mutex<ClientList> = {
         let map: ClientList = HashMap::new();
         Mutex::new(map)
     };
-    static ref CLIENT_TAKE: Mutex<ClientTake> = {
-        let map: ClientTake = HashMap::new();
+    static ref CLIENT_SUBSCRIBE: Mutex<ClientSubscribe> = {
+        let map: ClientSubscribe = HashMap::new();
         Mutex::new(map)
     };
-    static ref CLIENT_QUIC_PACKAGE: ServerChannel<quiche::ConnectionId<'static>> = {
-        let c: ServerChannel<quiche::ConnectionId<'static>> = ServerChannel::new();
-        c
-    };
-    static ref SERVER_CHANNEL_TAKE: ServerTake = {
-        let (send, revc) = mpsc::channel::<CLientChannelTake>();
-        ServerTake {
+    static ref SERVER_CHANNEL_SUBSCRIBE: ServerSubscribe = {
+        let (send, revc) = mpsc::channel::<CLientChannelSubscribe>();
+        ServerSubscribe {
             send: Arc::new(Mutex::new(send)),
             recv: Arc::new(Mutex::new(revc)),
         }
@@ -60,24 +56,9 @@ lazy_static! {
     };
 }
 
-struct ServerTake {
-    send: Arc<Mutex<mpsc::Sender<CLientChannelTake>>>,
-    recv: Arc<Mutex<mpsc::Receiver<CLientChannelTake>>>,
-}
-
-struct ServerChannel<T> {
-    tx: Arc<Mutex<mpsc::Sender<T>>>,
-    rx: Arc<Mutex<mpsc::Receiver<T>>>,
-}
-
-impl<T> ServerChannel<T> {
-    fn new() -> ServerChannel<T> {
-        let (tx, rx) = channel::<T>();
-        ServerChannel {
-            tx: Arc::new(Mutex::new(tx)),
-            rx: Arc::new(Mutex::new(rx)),
-        }
-    }
+struct ServerSubscribe {
+    send: Arc<Mutex<mpsc::Sender<CLientChannelSubscribe>>>,
+    recv: Arc<Mutex<mpsc::Receiver<CLientChannelSubscribe>>>,
 }
 
 struct Server {
@@ -109,7 +90,7 @@ struct Client {
 pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
     let mut service = Vec::new();
 
-    println!("{:?}", addr);
+    debug!("{:?}", addr);
     let mut socket = mio::net::UdpSocket::bind(addr).unwrap();
     let poll = mio::Poll::new().unwrap();
     poll.registry()
@@ -132,24 +113,18 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
 
     // 订阅
     service.push(thread::spawn(|| {
-        server_take();
+        server_subscribe();
     }));
 
     // 存活检查
     service.push(thread::spawn(|| {
-        server_survive();
+        server_alive_check();
     }));
 
     let server_r = server.clone();
     // 发送
     service.push(thread::spawn(|| {
-        server_distribute(ipc, server_r);
-    }));
-
-    let server_r = server.clone();
-    // quic数据包
-    service.push(thread::spawn(|| {
-        server_quic_packets(server_r);
+        server_send(ipc, server_r);
     }));
 
     for s in service {
@@ -169,17 +144,17 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
     let rng = SystemRandom::new();
     let conn_id_seed = ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &rng).unwrap();
 
-    println!("start server");
+    debug!("start server");
     loop {
         server.event_poll(&mut events, None);
-        println!("event! --> {:?}", events);
+        debug!("event! --> {:?}", events);
 
         'read: loop {
             // If the event loop reported no events, it means that the timeout
             // has expired, so handle it without attempting to read packets. We
             // will then proceed with the send loop.
             if events.is_empty() {
-                println!("timed out");
+                debug!("timed out");
                 // clients.values_mut().for_each(|c| c.conn.on_timeout());
                 break 'read;
             }
@@ -193,7 +168,8 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                     // There are no more UDP packets to read, so end the read
                     // loop.
                     if e.kind() == std::io::ErrorKind::WouldBlock {
-                        println!("recv() would block");
+                        debug!("recv() would block");
+
                         break 'read;
                     }
 
@@ -201,7 +177,7 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                 }
             };
 
-            println!("got {} bytes", len);
+            debug!("got {} bytes", len);
 
             let pkt_buf = &mut buf[..len];
 
@@ -215,7 +191,7 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                 }
             };
 
-            println!("got packet {:?}", hdr);
+            debug!("got packet {:?}", hdr);
 
             let conn_id = ring::hmac::sign(&conn_id_seed, &hdr.dcid);
             let conn_id = &conn_id.as_ref()[..quiche::MAX_CONN_ID_LEN];
@@ -240,7 +216,7 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
 
                     if let Err(e) = socket.send_to(out, from) {
                         if e.kind() == std::io::ErrorKind::WouldBlock {
-                            println!("send() would block");
+                            debug!("send() would block");
                             break;
                         }
 
@@ -277,7 +253,7 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
 
                     if let Err(e) = socket.send_to(out, from) {
                         if e.kind() == std::io::ErrorKind::WouldBlock {
-                            println!("send() would block");
+                            debug!("send() would block");
                             break;
                         }
 
@@ -304,7 +280,7 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                 // instead of changing it again.
                 let scid = hdr.dcid.clone();
 
-                println!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
+                info!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
 
                 let conn = quiche::accept(&scid, odcid.as_ref(), from, &mut config).unwrap();
 
@@ -314,7 +290,6 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                 };
 
                 clients_lock.insert(scid.clone(), client);
-                println!("insert");
 
                 (clients_lock.get_mut(&scid).unwrap(), scid.clone())
             } else {
@@ -337,7 +312,7 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                 }
             };
 
-            println!("{} processed {} bytes", client.conn.trace_id(), read);
+            debug!("{} processed {} bytes", client.conn.trace_id(), read);
 
             if client.conn.is_in_early_data() || client.conn.is_established() {
                 // Handle writable streams.
@@ -348,11 +323,11 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                 // Process all readable streams.
                 for s in client.conn.readable() {
                     while let Ok((read, fin)) = client.conn.stream_recv(s, &mut buf) {
-                        println!("{} received {} bytes", client.conn.trace_id(), read);
+                        debug!("{} received {} bytes", client.conn.trace_id(), read);
 
                         let stream_buf = &buf[..read];
 
-                        println!(
+                        debug!(
                             "{} stream {} has {} bytes (fin? {})",
                             client.conn.trace_id(),
                             s,
@@ -364,21 +339,19 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                     }
                 }
             }
-            if let Ok(tx) = CLIENT_QUIC_PACKAGE.tx.lock() {
-                tx.send(client_cid.clone()).unwrap();
-            }
+            send(client, socket.clone(), &mut out);
         }
     }
 }
 
-fn server_take() {
+fn server_subscribe() {
     loop {
-        let ((action, take_key), cid) = SERVER_CHANNEL_TAKE.recv.lock().unwrap().recv().unwrap();
-        let mut client_take_lock = CLIENT_TAKE.lock().unwrap();
+        let ((action, sub_key), cid) = SERVER_CHANNEL_SUBSCRIBE.recv.lock().unwrap().recv().unwrap();
+        let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
         let action = &action[..];
         match action {
             "ADD" => {
-                if let Some(v) = client_take_lock.get_mut(&take_key) {
+                if let Some(v) = client_sub_lock.get_mut(&sub_key) {
                     debug!("客户端订阅成功 {:?}", cid);
                     v.insert(cid);
                 } else {
@@ -386,7 +359,7 @@ fn server_take() {
                 }
             }
             "RM" => {
-                if let Some(v) = client_take_lock.get_mut(&take_key) {
+                if let Some(v) = client_sub_lock.get_mut(&sub_key) {
                     v.remove(&cid);
                     debug!("客户端取消订阅成功 {:?}", cid);
                 } else {
@@ -398,14 +371,14 @@ fn server_take() {
     }
 }
 
-fn server_survive() {
+fn server_alive_check() {
     loop {
         thread::sleep(std::time::Duration::from_millis(2000));
         let mut clients_lock = match CLIENT_LIST.lock() {
             Ok(v) => v,
             Err(_) => continue,
         };
-        let mut client_take_lock = match CLIENT_TAKE.lock() {
+        let mut client_sub_lock = match CLIENT_SUBSCRIBE.lock() {
             Ok(v) => v,
             Err(_) => continue,
         };
@@ -417,7 +390,7 @@ fn server_survive() {
                     c.conn.trace_id(),
                     c.conn.stats()
                 );
-                for cids in client_take_lock.values_mut() {
+                for cids in client_sub_lock.values_mut() {
                     cids.remove(&cid);
                 }
             }
@@ -427,17 +400,17 @@ fn server_survive() {
     }
 }
 
-fn server_distribute(ipc: String, server: Arc<Server>) {
+fn server_send(ipc: String, server: Arc<Server>) {
     let url = format!("ipc:///tmp/{}.ipc", ipc);
-    // let take_list = vec!["data"];
-    let mut client_take_lock = CLIENT_TAKE.lock().unwrap();
 
-    client_take_lock.insert(ipc, HashSet::new());
+    let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
+
+    client_sub_lock.insert(ipc, HashSet::new());
 
     debug!("{}", url);
 
     
-    for topic in  client_take_lock.keys(){
+    for topic in  client_sub_lock.keys(){
         let topic = topic.to_owned();
         let url = url.to_string();
         let server_r = server.clone();
@@ -459,7 +432,7 @@ fn server_distribute(ipc: String, server: Arc<Server>) {
                         buf.clear();
                     }
                     Err(err) => {
-                        println!("Client failed to receive msg '{}'.", err);
+                        debug!("Client failed to receive msg '{}'.", err);
                         break;
                     }
                 }
@@ -471,17 +444,17 @@ fn server_distribute(ipc: String, server: Arc<Server>) {
 
 fn distribute(server: Arc<Server>, key: String, data: &[u8]) {
     let socket = server.socket.clone();
-    let client_take = match CLIENT_TAKE.lock() {
+    let client_sub = match CLIENT_SUBSCRIBE.lock() {
         Ok(v) => v,
         Err(_) => return,
     };
-    let take = match client_take.get(&key) {
+    let sub = match client_sub.get(&key) {
         Some(v) => v,
         None => return,
     };
     let mut clients = CLIENT_LIST.lock().unwrap();
     let mut out = [0u8; 1024];
-    for cid in take {
+    for cid in sub {
         let client = clients.get_mut(&cid).unwrap();
 
         if client.conn.is_established() {
@@ -492,23 +465,8 @@ fn distribute(server: Arc<Server>, key: String, data: &[u8]) {
                 };
             }
 
+            info!("send client cid: {:?}", cid);
             send(client, socket.clone(), &mut out);
-        }
-    }
-}
-
-fn server_quic_packets(server: Arc<Server>) {
-    let rx = CLIENT_QUIC_PACKAGE.rx.lock().unwrap();
-    let socket = server.socket.clone();
-    let mut out = [0u8; 1024];
-
-    loop {
-        if let Ok(cid) = rx.recv() {
-            if let Ok(mut clients) = CLIENT_LIST.lock() {
-                if let Some(client) = clients.get_mut(&cid) {
-                    send(client, socket.clone(), &mut out);
-                }
-            }
         }
     }
 }
@@ -629,7 +587,7 @@ fn handle_stream(
 
     if let Some(_v) = command.find(";") {
         let commands: Vec<&str> = command.split(";").collect();
-        let send_lock = SERVER_CHANNEL_TAKE.send.lock().unwrap();
+        let send_lock = SERVER_CHANNEL_SUBSCRIBE.send.lock().unwrap();
         for i in commands {
             if let Some(num) = i.find(" ") {
                 let data = (
@@ -646,7 +604,7 @@ fn handle_stream(
                 (command[..num].to_string(), command[num + 1..].to_string()),
                 cid.clone(),
             );
-            let send_lock = SERVER_CHANNEL_TAKE.send.lock().unwrap();
+            let send_lock = SERVER_CHANNEL_SUBSCRIBE.send.lock().unwrap();
             send_lock.send(data).unwrap();
         }
     }

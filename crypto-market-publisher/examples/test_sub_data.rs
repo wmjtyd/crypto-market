@@ -4,7 +4,7 @@ use nanomsg::{Socket, Protocol};
 
 fn main() {
     let mut socket = Socket::new(Protocol::Pub).unwrap();
-    let mut endpoint = socket.bind("ipc:///tmp/name_name_name_name_name.ipc").unwrap();
+    let mut endpoint = socket.bind("ipc:///tmp/name_name_name_name.ipc").unwrap();
     let mut count = 1u32;
     let topic = b"";
 
