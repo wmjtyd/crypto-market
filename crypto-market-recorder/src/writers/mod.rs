@@ -2,9 +2,9 @@
 
 use concat_string::concat_string;
 use nanomsg::{Protocol, Socket};
+use std::io::Read;
 use tracing::error;
 use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
-use std::io::Read;
 
 // pub use file_writer::FileWriter;
 pub use wmjtyd_libstock::file::writer::DataWriter;
@@ -21,17 +21,20 @@ pub async fn create_write_file_thread(
     ipc: String,
 ) -> RecorderWriterResult<()> {
     // concat_string for better performance
-    let ipc_exchange_market_type_msg_type = concat_string!(
-        "ipc:///tmp/", ipc, ".ipc"
-    );
+    let ipc_exchange_market_type_msg_type = concat_string!("ipc:///tmp/", ipc, ".ipc");
 
     let task = async move {
         let mut date_writer = DataWriter::new();
         date_writer.start().await?;
 
-        let mut socket = Socket::new(Protocol::Sub).map_err(RecorderWriterError::SocketCreationFailed)?;
-        socket.subscribe(b"").map_err(RecorderWriterError::SocketCreationFailed)?;
-        let mut endpoint = socket.connect(&ipc_exchange_market_type_msg_type).map_err(RecorderWriterError::SocketConnectionFailed)?;
+        let mut socket =
+            Socket::new(Protocol::Sub).map_err(RecorderWriterError::SocketCreationFailed)?;
+        socket
+            .subscribe(b"")
+            .map_err(RecorderWriterError::SocketCreationFailed)?;
+        let mut endpoint = socket
+            .connect(&ipc_exchange_market_type_msg_type)
+            .map_err(RecorderWriterError::SocketConnectionFailed)?;
 
         loop {
             // 数据 payload
@@ -51,7 +54,9 @@ pub async fn create_write_file_thread(
             }
         }
 
-        endpoint.shutdown().map_err(RecorderWriterError::SocketShutdownFailed)?;
+        endpoint
+            .shutdown()
+            .map_err(RecorderWriterError::SocketShutdownFailed)?;
 
         Ok::<(), RecorderWriterError>(())
     };
@@ -62,7 +67,8 @@ pub async fn create_write_file_thread(
         if let Err(err) = response {
             error!("failed to run create_write_file task: {err}");
         }
-    }).await?;
+    })
+    .await?;
 
     Ok(())
 }

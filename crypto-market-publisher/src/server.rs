@@ -3,10 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Read,
     net::{self, SocketAddr},
-    sync::{
-        mpsc,
-        Arc, Mutex,
-    },
+    sync::{mpsc, Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -346,7 +343,12 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
 
 fn server_subscribe() {
     loop {
-        let ((action, sub_key), cid) = SERVER_CHANNEL_SUBSCRIBE.recv.lock().unwrap().recv().unwrap();
+        let ((action, sub_key), cid) = SERVER_CHANNEL_SUBSCRIBE
+            .recv
+            .lock()
+            .unwrap()
+            .recv()
+            .unwrap();
         let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
         let action = &action[..];
         match action {
@@ -409,8 +411,7 @@ fn server_send(ipc: String, server: Arc<Server>) {
 
     debug!("{}", url);
 
-    
-    for topic in  client_sub_lock.keys(){
+    for topic in client_sub_lock.keys() {
         let topic = topic.to_owned();
         let url = url.to_string();
         let server_r = server.clone();
@@ -458,7 +459,6 @@ fn distribute(server: Arc<Server>, key: String, data: &[u8]) {
         let client = clients.get_mut(&cid).unwrap();
 
         if client.conn.is_established() {
-
             for stream_id in client.conn.writable() {
                 if let Err(e) = client.conn.stream_send(stream_id, &data, false) {
                     println!("error: {:?}", e);

@@ -16,21 +16,28 @@ async fn main() {
     )
     .get_matches();
 
-    let exchange = matches.value_of("EXCHANGE").unwrap(); 
+    let exchange = matches.value_of("EXCHANGE").unwrap();
     let market_type = matches.value_of("MARKET_TYPE").unwrap();
     let msg_type = matches.value_of("MSG_TYPE").unwrap();
     let symbol = matches.value_of("SYMBOL").unwrap();
 
     let ipc = if let Some(period) = matches.value_of("PERIOD") {
-        concat_string!(exchange, "_", market_type, "_", msg_type, "_", symbol, "_", period)
+        concat_string!(
+            exchange,
+            "_",
+            market_type,
+            "_",
+            msg_type,
+            "_",
+            symbol,
+            "_",
+            period
+        )
     } else {
         concat_string!(exchange, "_", market_type, "_", msg_type, "_", symbol)
     };
 
-    create_write_file_thread(
-        exchange,
-        market_type,
-        msg_type,
-        ipc.to_string()
-    ).await.expect("create_write_file_thread failed");
+    create_write_file_thread(exchange, market_type, msg_type, ipc.to_string())
+        .await
+        .expect("create_write_file_thread failed");
 }

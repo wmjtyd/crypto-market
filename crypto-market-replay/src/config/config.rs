@@ -6,7 +6,7 @@ pub struct ApplicationConfig {
     ///日志等级
     pub log_level: String,
     ///端口
-    pub server:ServerConfig,
+    pub server: ServerConfig,
     ///数据库
     pub record_dir: String,
 
@@ -14,14 +14,12 @@ pub struct ApplicationConfig {
 }
 
 impl ApplicationConfig {
-
-   pub fn new(toml_data:&str) ->Self
-    {  let config = match toml::from_str(toml_data) {
-        Ok(e) => e,
-        Err(e) => panic!("{}", e),
-    };
-    config
-
+    pub fn new(toml_data: &str) -> Self {
+        let config = match toml::from_str(toml_data) {
+            Ok(e) => e,
+            Err(e) => panic!("{}", e),
+        };
+        config
     }
 }
 
