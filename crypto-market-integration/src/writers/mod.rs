@@ -1,6 +1,3 @@
-pub(super) mod file_save;
-pub(super) mod file_writer;
-
 use crypto_crawler::*;
 use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade};
 use futures::{future::BoxFuture, FutureExt};
@@ -22,8 +19,6 @@ pub trait Writer {
     fn write(&mut self, s: &str);
     fn close(&mut self);
 }
-
-pub use file_writer::FileWriter;
 
 use crate::data::{encode_bbo, encode_kline, encode_orderbook, encode_trade};
 

@@ -1,5 +1,5 @@
 [package]
-name = "carbonbot"
+name = "crypto-market-integration"
 version = "2.11.2"
 authors = ["soulmachine <soulmachine@gmail.com>"]
 edition = "2021"
