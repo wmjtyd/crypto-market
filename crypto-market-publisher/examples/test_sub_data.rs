@@ -1,6 +1,6 @@
-use std::{time::Duration, thread, io::Write};
+use std::{io::Write, thread, time::Duration};
 
-use nanomsg::{Socket, Protocol};
+use nanomsg::{Protocol, Socket};
 
 fn main() {
     let mut socket = Socket::new(Protocol::Pub).unwrap();
@@ -28,5 +28,4 @@ fn main() {
     }
 
     endpoint.shutdown().unwrap();
-
 }

@@ -21,7 +21,7 @@ fn client(topic: &[u8]) {
     let mut msg = String::new();
     loop {
         // match socket.read_to_string(&mut msg) {
-            let mut data = Vec::new();
+        let mut data = Vec::new();
         match socket.read_to_end(&mut data) {
             Ok(_) => {
                 println!("Recv '{:?}'.", data);
@@ -47,7 +47,7 @@ fn server(topic: &[u8]) {
     let mut msg = Vec::with_capacity(topic.len() + 16);
     let mut index: usize = 0;
     loop {
-        let postfix = if (index%2) == 0 {
+        let postfix = if (index % 2) == 0 {
             format!(" # hello world {}", count)
         } else {
             format!(" #{}", count)
@@ -90,7 +90,6 @@ fn device(topic: &[u8]) {
     front_endpoint.shutdown().unwrap();
     back_endpoint.shutdown().unwrap();
 }
-
 
 fn usage() {
     println!("Usage: pubsub [client|server|device] topic");

@@ -11,18 +11,18 @@ use axum::{
 };
 use crypto_crawler::{MarketType, Message, MessageType};
 
-use chrono::{DateTime, Local, TimeZone, Timelike, Utc, Duration};
+use chrono::{DateTime, Duration, Local, TimeZone, Timelike, Utc};
 use crypto_msg_parser::parse_l2_topk;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
-use std::{sync::Mutex, ops::Add};
 use std::{
     collections::HashMap,
     net::SocketAddr,
     sync::{mpsc::Receiver, Arc},
 };
+use std::{ops::Add, sync::Mutex};
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use websocket::{config::config::ApplicationConfig, init_config};
@@ -131,7 +131,6 @@ pub async fn handler(
     // ]);
     // let result: StreamBody<ReaderStream<File>> = StreamBody::new(stream);
 
-
     let file = match tokio::fs::File::open(src).await {
         Ok(file) => file,
         Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
@@ -169,7 +168,7 @@ pub fn filename(params: &Params) -> Vec<String> {
         };
         let filename = format!("{}/{}", datetime, ipc);
         files.push(filename);
-        begin_datetime=begin_datetime.add(Duration::days(1));
+        begin_datetime = begin_datetime.add(Duration::days(1));
         datetime = format!("{}", begin_datetime.format("%Y%m%d"));
     }
     files

@@ -1,14 +1,13 @@
-pub(super) mod file_writer;
-pub(super) mod file_save;
+// pub(super) mod file_writer;
 
-use futures::{future::BoxFuture, FutureExt};
-use log::*;
+use concat_string::concat_string;
 use nanomsg::{Protocol, Socket};
 use std::io::Read;
+use tracing::error;
+use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
 
-pub use file_writer::FileWriter;
-pub use crate::data::decode_orderbook;
-pub use crate::writers::file_save::WriteData;
+// pub use file_writer::FileWriter;
+pub use wmjtyd_libstock::file::writer::DataWriter;
 
 pub trait Writer {
     fn write(&mut self, s: &str);
@@ -16,40 +15,83 @@ pub trait Writer {
 }
 
 pub async fn create_write_file_thread(
-    _exchange: String,
-    _market_type: String,
-    _msg_type: String,
-    ipc: String
-) {
-    tokio::task::spawn(async move {
-        let ipc_exchange_market_type_msg_type = format!(
-            "ipc:///tmp/{}.ipc",
-            &ipc
-        ); 
+    _exchange: &str,
+    _market_type: &str,
+    _msg_type: &str,
+    ipc: String,
+) -> RecorderWriterResult<()> {
+    // concat_string for better performance
+    let ipc_exchange_market_type_msg_type = concat_string!("ipc:///tmp/", ipc, ".ipc");
 
-        let mut write_data = WriteData::new();
-        write_data.start();
+    let task = async move {
+        let mut date_writer = DataWriter::new();
+        date_writer.start().await?;
 
-        let mut socket = Socket::new(Protocol::Sub).unwrap();
-        socket.subscribe("".as_bytes()).unwrap();
-        let mut endpoint = socket.connect(&ipc_exchange_market_type_msg_type).unwrap();
+        let mut socket =
+            Socket::new(Protocol::Sub).map_err(RecorderWriterError::SocketCreationFailed)?;
+        socket
+            .subscribe(b"")
+            .map_err(RecorderWriterError::SocketCreationFailed)?;
+        let mut endpoint = socket
+            .connect(&ipc_exchange_market_type_msg_type)
+            .map_err(RecorderWriterError::SocketConnectionFailed)?;
+
         loop {
             // 数据 payload
-            let mut payload: Vec<u8> = Vec::new();
+            let mut payload = Vec::<u8>::new();
             let read_result = socket.read_to_end(&mut payload);
             match read_result {
-                Ok(_size) => {
-                    let data = unsafe {std::mem::transmute::<Vec<u8>, Vec<i8>>(payload)};
-                    write_data.add(ipc.to_string(), data);
+                Ok(_) => {
+                    date_writer.add(DataEntry {
+                        filename: ipc.to_string(),
+                        data: payload,
+                    })?;
                 }
                 Err(err) => {
-                    error!("Client failed to receive payload '{}'.", err);
+                    error!("Client failed to receive payload: {err}");
                     break;
                 }
             }
         }
-        endpoint.shutdown();
+
+        endpoint
+            .shutdown()
+            .map_err(RecorderWriterError::SocketShutdownFailed)?;
+
+        Ok::<(), RecorderWriterError>(())
+    };
+
+    tokio::task::spawn(async {
+        let response = task.await;
+
+        if let Err(err) = response {
+            error!("failed to run create_write_file task: {err}");
+        }
     })
-    .await
-    .expect("msg");
+    .await?;
+
+    Ok(())
 }
+
+#[derive(thiserror::Error, Debug)]
+pub enum RecorderWriterError {
+    #[error("writer error: {0}")]
+    WriterError(#[from] WriteError),
+
+    #[error("failed to create the writer thread: {0}")]
+    CreateThreadFailed(#[from] tokio::task::JoinError),
+
+    #[error("failed to shutdown the socket: {0}")]
+    SocketShutdownFailed(nanomsg::Error),
+
+    #[error("failed to create a socket: {0}")]
+    SocketCreationFailed(nanomsg::Error),
+
+    #[error("failed to connect to a socket: {0}")]
+    SocketConnectionFailed(nanomsg::Error),
+
+    #[error("failed to subscribe to a socket: {0}")]
+    SocketSubscribeFailed(nanomsg::Error),
+}
+
+pub type RecorderWriterResult<T> = Result<T, RecorderWriterError>;

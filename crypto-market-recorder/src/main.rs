@@ -1,4 +1,5 @@
 use clap::clap_app;
+use concat_string::concat_string;
 use crypto_market_recorder::create_write_file_thread;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -15,23 +16,28 @@ async fn main() {
     )
     .get_matches();
 
-
-    let exchange = matches.value_of("EXCHANGE").unwrap().to_string(); 
+    let exchange = matches.value_of("EXCHANGE").unwrap();
     let market_type = matches.value_of("MARKET_TYPE").unwrap();
     let msg_type = matches.value_of("MSG_TYPE").unwrap();
     let symbol = matches.value_of("SYMBOL").unwrap();
 
     let ipc = if let Some(period) = matches.value_of("PERIOD") {
-        format!("{}_{}_{}_{}_{}", exchange, market_type, msg_type, symbol, period)
+        concat_string!(
+            exchange,
+            "_",
+            market_type,
+            "_",
+            msg_type,
+            "_",
+            symbol,
+            "_",
+            period
+        )
     } else {
-        format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
+        concat_string!(exchange, "_", market_type, "_", msg_type, "_", symbol)
     };
 
-    create_write_file_thread(
-        exchange.to_string(),
-        market_type.to_string(),
-        msg_type.to_string(),
-        ipc.to_string()
-    ).await;
-
+    create_write_file_thread(exchange, market_type, msg_type, ipc.to_string())
+        .await
+        .expect("create_write_file_thread failed");
 }

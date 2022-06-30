@@ -1,9 +1,9 @@
-use std::{time::SystemTime, collections::HashMap};
+use std::{collections::HashMap, time::SystemTime};
 
 use crypto_crawler::{MarketType, MessageType};
-use crypto_msg_parser::{OrderBookMsg, Order, TradeMsg, TradeSide, KlineMsg, BboMsg};
+use crypto_msg_parser::{BboMsg, KlineMsg, Order, OrderBookMsg, TradeMsg, TradeSide};
 use phf::phf_map;
-use rust_decimal::{Decimal, prelude::ToPrimitive};
+use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 pub static EXANGE: phf::Map<&'static str, u8> = phf_map! {
     "crypto" => 1,
@@ -31,7 +31,6 @@ pub static PERIOD: phf::Map<&'static str, u8> = phf_map! {
     "30m" => 3,
     "1h" => 4,
 };
-
 
 pub fn long_to_hex(num: i64) -> String {
     let num_hex = format!("{:x}", num); // to hex
@@ -107,7 +106,6 @@ fn encode_num_to_bytes(mut value: String) -> [i8; 5] {
     result
 }
 
-
 fn encode_num_to_10_bytes(mut value: String) -> [i8; 10] {
     let mut result: [i8; 10] = [0; 10];
     let mut e = 0;
@@ -128,7 +126,7 @@ fn encode_num_to_10_bytes(mut value: String) -> [i8; 10] {
     let hex_str = long_to_hex(value.parse().unwrap());
     let hex_byte = hex_to_byte(hex_str);
     let length = hex_byte.len();
-    
+
     if hex_byte.len() > 0 {
         result[8] = *hex_byte.get(length - 1).unwrap();
     }
@@ -159,7 +157,6 @@ fn encode_num_to_10_bytes(mut value: String) -> [i8; 10] {
 
     result
 }
-
 
 pub fn generated_diffs(old: &OrderBookMsg, latest: &OrderBookMsg) -> OrderBookMsg {
     let mut diff = OrderBookMsg {
@@ -407,8 +404,8 @@ pub fn encode_orderbook(orderbook: &OrderBookMsg) -> Vec<i8> {
         MarketType::EuropeanOption => 6,
         MarketType::QuantoFuture => 7,
         MarketType::QuantoSwap => 8,
-        MarketType::Move => 0,        
-        MarketType::BVOL => 0,        
+        MarketType::Move => 0,
+        MarketType::BVOL => 0,
         MarketType::AmericanOption => 0,
     };
     orderbook_bytes.push(_market_type);
@@ -722,7 +719,6 @@ pub fn encode_trade(orderbook: &TradeMsg) -> Vec<i8> {
 }
 
 fn decode_trade(payload: Vec<i8>) -> TradeMsg {
-
     let mut data_byte_index = 0;
 
     //1、交易所时间戳:6 or 8 字节时间戳
@@ -830,8 +826,7 @@ fn decode_trade(payload: Vec<i8>) -> TradeMsg {
 
     // quant
     let mut quant_array = [0i8; 8];
-    quant_array[4..]
-        .copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    quant_array[4..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
     let quant_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(quant_array) };
     let quant_int = i64::from_be_bytes(quant_array);
 
@@ -863,7 +858,6 @@ fn decode_trade(payload: Vec<i8>) -> TradeMsg {
 
     trade
 }
-
 
 pub fn encode_bbo(orderbook: &BboMsg) -> Vec<i8> {
     let mut orderbook_bytes: Vec<i8> = Vec::new();
@@ -943,7 +937,6 @@ pub fn encode_bbo(orderbook: &BboMsg) -> Vec<i8> {
 }
 
 fn decode_bbo(payload: Vec<i8>) -> BboMsg {
-
     let mut data_byte_index = 0;
 
     //1、交易所时间戳:6 or 8 字节时间戳
@@ -1042,8 +1035,7 @@ fn decode_bbo(payload: Vec<i8>) -> BboMsg {
 
     // ask quant
     let mut quant_array = [0i8; 8];
-    quant_array[4..]
-        .copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    quant_array[4..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
     let quant_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(quant_array) };
     let quant_int = i64::from_be_bytes(quant_array);
 
@@ -1079,8 +1071,7 @@ fn decode_bbo(payload: Vec<i8>) -> BboMsg {
 
     // bid quant
     let mut quant_array = [0i8; 8];
-    quant_array[4..]
-        .copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    quant_array[4..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
     let quant_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(quant_array) };
     let quant_int = i64::from_be_bytes(quant_array);
 
@@ -1115,7 +1106,6 @@ fn decode_bbo(payload: Vec<i8>) -> BboMsg {
 
     bbo
 }
-
 
 pub fn encode_kline(orderbook: &KlineMsg) -> Vec<i8> {
     let mut orderbook_bytes: Vec<i8> = Vec::new();
@@ -1178,7 +1168,7 @@ pub fn encode_kline(orderbook: &KlineMsg) -> Vec<i8> {
     //7、PERIOD 1字节信息标识
     let _period = (*PERIOD.get(&orderbook.period.as_str()).unwrap()) as i8;
     orderbook_bytes.push(_period);
-    
+
     //8、open
     let price = orderbook.open;
     let price_bytes = encode_num_to_bytes(price.to_string());
@@ -1209,12 +1199,10 @@ pub fn encode_kline(orderbook: &KlineMsg) -> Vec<i8> {
     // let price_bytes = encode_num_to_bytes(price.unwrap().to_string());
     // orderbook_bytes.extend_from_slice(&price_bytes);
 
-
     orderbook_bytes
 }
 
 fn decode_kline(payload: Vec<i8>) -> KlineMsg {
-
     let mut data_byte_index = 0;
 
     //1、交易所时间戳:6 or 8 字节时间戳
@@ -1324,8 +1312,7 @@ fn decode_kline(payload: Vec<i8>) -> KlineMsg {
 
     // high
     let mut quant_array = [0i8; 8];
-    quant_array[4..]
-        .copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    quant_array[4..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
     let quant_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(quant_array) };
     let quant_int = i64::from_be_bytes(quant_array);
 
@@ -1361,8 +1348,7 @@ fn decode_kline(payload: Vec<i8>) -> KlineMsg {
 
     // close
     let mut quant_array = [0i8; 8];
-    quant_array[4..]
-        .copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
+    quant_array[4..].copy_from_slice(&payload[data_byte_index..data_byte_index + 4]);
     let quant_array = unsafe { std::mem::transmute::<[i8; 8], [u8; 8]>(quant_array) };
     let quant_int = i64::from_be_bytes(quant_array);
 
@@ -1380,8 +1366,7 @@ fn decode_kline(payload: Vec<i8>) -> KlineMsg {
 
     // volume
     let mut quant_array = [0i8; 16];
-    quant_array[7..]
-        .copy_from_slice(&payload[data_byte_index..data_byte_index + 9]);
+    quant_array[7..].copy_from_slice(&payload[data_byte_index..data_byte_index + 9]);
     let quant_array = unsafe { std::mem::transmute::<[i8; 16], [u8; 16]>(quant_array) };
     let quant_int = i128::from_be_bytes(quant_array);
 

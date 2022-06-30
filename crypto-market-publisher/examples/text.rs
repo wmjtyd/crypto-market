@@ -52,7 +52,6 @@ trait Code<T> {
     fn decode(&self, c: Vec<u8>) -> T;
 }
 
-
 // 测试结果
 #[tokio::main]
 async fn main() {

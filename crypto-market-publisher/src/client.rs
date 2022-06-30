@@ -41,7 +41,6 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
         .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
         .unwrap();
 
-
     // Generate a random source connection ID for the connection.
     let mut scid = [0; quiche::MAX_CONN_ID_LEN];
     SystemRandom::new().fill(&mut scid[..]).unwrap();
@@ -61,7 +60,8 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
         buf.iter()
             .map(|b| format!("{:02x}", b))
             .collect::<Vec<String>>()
-            .join("").len()
+            .join("")
+            .len()
     );
 
     let (write, send_info) = conn.send(&mut out).expect("initial send failed");
@@ -216,7 +216,6 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
             debug!("written {}", write);
         }
 
-
         if conn.is_closed() {
             error!("connection closed, {:?}", conn.stats());
             break;
@@ -224,11 +223,15 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
     }
 }
 
-pub fn start_client(addr: SocketAddr, config: Config, subscribe_list: Vec<&str>) -> Receiver<Vec<i8>> {
+pub fn start_client(
+    addr: SocketAddr,
+    config: Config,
+    subscribe_list: Vec<&str>,
+) -> Receiver<Vec<i8>> {
     let (tx, rx) = channel::<Vec<i8>>();
     let subscribe_list: Vec<String> = subscribe_list.into_iter().map(|e| e.to_string()).collect();
     tokio::task::spawn(async move {
-        client(addr,config, subscribe_list, tx.clone());
+        client(addr, config, subscribe_list, tx.clone());
     });
     rx
 }

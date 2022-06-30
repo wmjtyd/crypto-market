@@ -1,6 +1,6 @@
-use crypto_market_integration::{crawl_other, create_writer_threads};
 use clap::clap_app;
 use crypto_crawler::*;
+use crypto_market_integration::{crawl_other, create_writer_threads};
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use futures::Future;
@@ -146,7 +146,6 @@ async fn main() {
         return;
     }
     let msg_type = msg_type.unwrap();
-
 
     let data_dir = if std::env::var("DATA_DIR").is_err() {
         info!("The DATA_DIR environment variable does not exist");
