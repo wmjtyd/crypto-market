@@ -16,6 +16,6 @@ tokio = { version = "0.2", features = ["full"] }
 clap = "~2.27.0"
 env_logger = "0.4.3"
 url = "1"
-carbonbot  = { path = "../crypto-market-integration"}
+carbonbot = { path = "../crypto-market-integration"}
 
 [dev-dependencies]

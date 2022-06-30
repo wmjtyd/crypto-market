@@ -1,5 +1,5 @@
 [package]
-name = "crypto-market-integration"
+name = "carbonbot"
 version = "2.11.2"
 authors = ["soulmachine <soulmachine@gmail.com>"]
 edition = "2021"
@@ -35,9 +35,3 @@ phf = { version = "0.10.1", features = ["macros"] }
 futures = "0.3.21"
 
 clap = "~2.27.0"
-
-[profile.release]
-lto = true
-strip = "debuginfo"
-codegen-units = 1
-opt-level="z"
