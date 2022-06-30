@@ -60,14 +60,10 @@ pub async fn crawl(
     } else {
         match msg_type {
             MessageType::BBO => {
-                reload_loop(async move {
-                    crawl_bbo(exchange, market_type, symbols, tx).await;
-                }).await
+                crawl_bbo(exchange, market_type, symbols, tx).await;
             }
             MessageType::Trade => {
-                reload_loop(async move {
-                    crawl_trade(exchange, market_type, symbols, tx).await;
-                }).await
+                crawl_trade(exchange, market_type, symbols, tx).await;
             }
             MessageType::L2Event => {
                 crawl_l2_event(exchange, market_type, symbols, tx).await;
