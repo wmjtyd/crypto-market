@@ -575,6 +575,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
+ "concat-string",
  "crypto-crawler",
  "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "crypto-markets",
@@ -597,7 +598,9 @@ dependencies = [
  "serde_json",
  "signal-hook",
  "slack-hook",
+ "thiserror",
  "tokio 1.19.2",
+ "tracing",
  "wmjtyd-libstock",
 ]
 
