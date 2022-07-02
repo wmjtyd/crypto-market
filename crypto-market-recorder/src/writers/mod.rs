@@ -24,9 +24,9 @@ pub async fn create_write_file_thread(
     let ipc_exchange_market_type_msg_type = concat_string!("ipc:///tmp/", ipc, ".ipc");
 
     let task = async move {
-        let mut date_writer = DataWriter::new();
-        date_writer.start().await?;
-
+        let mut data_writer = DataWriter::new();
+        data_writer.start().await?;
+    
         let mut socket =
             Socket::new(Protocol::Sub).map_err(RecorderWriterError::SocketCreationFailed)?;
         socket
@@ -36,23 +36,28 @@ pub async fn create_write_file_thread(
             .connect(&ipc_exchange_market_type_msg_type)
             .map_err(RecorderWriterError::SocketConnectionFailed)?;
 
-        loop {
+        tokio::task::spawn_blocking(move || loop {
             // 数据 payload
             let mut payload = Vec::<u8>::new();
             let read_result = socket.read_to_end(&mut payload);
             match read_result {
                 Ok(_) => {
-                    date_writer.add(DataEntry {
+                    let result = data_writer.add(DataEntry {
                         filename: ipc.to_string(),
                         data: payload,
-                    })?;
+                    });
+
+                    if let Err(e) = result {
+                        error!("Failed to add data: {e}");
+                        break;
+                    }
                 }
                 Err(err) => {
                     error!("Client failed to receive payload: {err}");
                     break;
                 }
             }
-        }
+        }).await?;
 
         endpoint
             .shutdown()
