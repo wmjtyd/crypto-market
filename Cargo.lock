@@ -57,6 +57,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb07d2053ccdbe10e2af2995a2f116c1330396493dc1269f6a91d0ae82e19704"
 
 [[package]]
+name = "arrayref"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4c527152e37cf757a3f78aae5a06fbeefdb07ccc535c980a3208ee3060dd544"
+
+[[package]]
 name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -476,22 +482,8 @@ name = "crypto-contract-value"
 version = "1.4.7"
 source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
 dependencies = [
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
- "once_cell",
- "reqwest 0.11.11",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "crypto-contract-value"
-version = "1.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "610c8ffa456d7621f5e10dc1d093fb3bc07fca9740a647d940a28dde25cf4343"
-dependencies = [
- "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-pair 2.2.10",
+ "crypto-market-type",
+ "crypto-pair",
  "once_cell",
  "reqwest 0.11.11",
  "serde",
@@ -501,15 +493,15 @@ dependencies = [
 [[package]]
 name = "crypto-crawler"
 version = "4.4.4"
-source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
+source = "git+https://github.com/wmjtyd/crypto-crawler-rs?rev=bb8d89563e6add82a0825f7b2a47d58c42d423cc#bb8d89563e6add82a0825f7b2a47d58c42d423cc"
 dependencies = [
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-markets 1.2.7",
- "crypto-msg-parser 2.4.12",
- "crypto-msg-type 1.0.7 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
- "crypto-rest-client 0.9.2 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-ws-client 4.11.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-market-type",
+ "crypto-markets",
+ "crypto-msg-parser 2.4.12 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-msg-type",
+ "crypto-pair",
+ "crypto-rest-client",
+ "crypto-ws-client",
  "fslock",
  "log 0.4.17",
  "once_cell",
@@ -522,17 +514,16 @@ dependencies = [
 
 [[package]]
 name = "crypto-crawler"
-version = "4.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ef15c964c5c3d8ea2f313abf4e88b2cffd1222f4ce38e830360391d53a03cea"
+version = "4.4.4"
+source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
 dependencies = [
- "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-markets 1.2.8",
- "crypto-msg-parser 2.5.4",
- "crypto-msg-type 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-pair 2.2.10",
- "crypto-rest-client 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-ws-client 4.11.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "crypto-market-type",
+ "crypto-markets",
+ "crypto-msg-parser 2.4.12 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-msg-type",
+ "crypto-pair",
+ "crypto-rest-client",
+ "crypto-ws-client",
  "fslock",
  "log 0.4.17",
  "once_cell",
@@ -549,14 +540,14 @@ version = "2.11.2"
 dependencies = [
  "chrono",
  "clap",
- "crypto-crawler 4.4.4",
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-markets 1.2.7",
- "crypto-msg-parser 2.4.12",
- "crypto-msg-type 1.0.7 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
- "crypto-rest-client 0.9.2 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-ws-client 4.11.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-crawler 4.4.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-market-type",
+ "crypto-markets",
+ "crypto-msg-parser 2.4.12 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-msg-type",
+ "crypto-pair",
+ "crypto-rest-client",
+ "crypto-ws-client",
  "env_logger 0.9.0",
  "futures 0.3.21",
  "lazy_static",
@@ -597,14 +588,14 @@ dependencies = [
  "chrono",
  "clap",
  "concat-string",
- "crypto-crawler 4.4.4",
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-markets 1.2.7",
- "crypto-msg-parser 2.4.12",
- "crypto-msg-type 1.0.7 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
- "crypto-rest-client 0.9.2 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-ws-client 4.11.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-crawler 4.4.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-market-type",
+ "crypto-markets",
+ "crypto-msg-parser 2.4.12 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-msg-type",
+ "crypto-pair",
+ "crypto-rest-client",
+ "crypto-ws-client",
  "env_logger 0.9.0",
  "futures 0.3.21",
  "lazy_static",
@@ -622,18 +613,8 @@ dependencies = [
  "thiserror",
  "tokio 1.19.2",
  "tracing",
+ "tracing-subscriber",
  "wmjtyd-libstock",
-]
-
-[[package]]
-name = "crypto-market-type"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9db536efbed3f5b89a5322eb2d8613360695e6656a7da4cf5987d61f193b08"
-dependencies = [
- "serde",
- "strum",
- "strum_macros",
 ]
 
 [[package]]
@@ -652,22 +633,8 @@ version = "1.2.7"
 source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
 dependencies = [
  "chrono",
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
- "reqwest 0.11.11",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "crypto-markets"
-version = "1.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12ff1c88568b93e5619267c9a3fb8a10c55bdc460e3b4a7f4fad07806e752ae4"
-dependencies = [
- "chrono",
- "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-pair 2.2.10",
+ "crypto-market-type",
+ "crypto-pair",
  "reqwest 0.11.11",
  "serde",
  "serde_json",
@@ -676,13 +643,13 @@ dependencies = [
 [[package]]
 name = "crypto-msg-parser"
 version = "2.4.12"
-source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
+source = "git+https://github.com/wmjtyd/crypto-crawler-rs?rev=bb8d89563e6add82a0825f7b2a47d58c42d423cc#bb8d89563e6add82a0825f7b2a47d58c42d423cc"
 dependencies = [
  "chrono",
- "crypto-contract-value 1.4.7",
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-msg-type 1.0.7 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
+ "crypto-contract-value",
+ "crypto-market-type",
+ "crypto-msg-type",
+ "crypto-pair",
  "if_chain",
  "once_cell",
  "reqwest 0.11.11",
@@ -695,33 +662,20 @@ dependencies = [
 
 [[package]]
 name = "crypto-msg-parser"
-version = "2.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bd7756b030ff640a6e0172238aadce8e9e85ed8628350048b6b53b913816df8"
+version = "2.4.12"
+source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
 dependencies = [
  "chrono",
- "crypto-contract-value 1.4.8",
- "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-msg-type 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "crypto-pair 2.2.10",
+ "crypto-contract-value",
+ "crypto-market-type",
+ "crypto-msg-type",
+ "crypto-pair",
  "if_chain",
  "once_cell",
  "reqwest 0.11.11",
  "serde",
  "serde_json",
  "simple-error",
- "strum",
- "strum_macros",
-]
-
-[[package]]
-name = "crypto-msg-type"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a5e0fc3bbf444ab14af8db15215eb65846830ee5871d5e4bf585dd5cf1c21f"
-dependencies = [
- "serde",
- "serde_json",
  "strum",
  "strum_macros",
 ]
@@ -742,36 +696,8 @@ name = "crypto-pair"
 version = "2.2.9"
 source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
 dependencies = [
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-market-type",
  "once_cell",
- "reqwest 0.11.11",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "crypto-pair"
-version = "2.2.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e12b8c27f6614f1460320625caa2770c903d5e53e30465056ea5921d9ef01687"
-dependencies = [
- "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "once_cell",
- "reqwest 0.11.11",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "crypto-rest-client"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b46e2d530b5108cad9b439fb981abcb2a1db0f7448bb6e7395d8a786070a37a"
-dependencies = [
- "crypto-market-type 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.17",
- "once_cell",
- "regex 1.5.6",
  "reqwest 0.11.11",
  "serde",
  "serde_json",
@@ -782,32 +708,13 @@ name = "crypto-rest-client"
 version = "0.9.2"
 source = "git+https://github.com/wmjtyd/crypto-crawler-rs#c821e0c764547f02e6a5d36176fa9b39d93829ba"
 dependencies = [
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-market-type",
  "log 0.4.17",
  "once_cell",
  "regex 1.5.6",
  "reqwest 0.11.11",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "crypto-ws-client"
-version = "4.11.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d54e96d3afa342da85b45c2a63485ca48171ce688858bc3082683fc207cc8632"
-dependencies = [
- "async-trait",
- "fast-socks5",
- "flate2",
- "futures-util",
- "governor",
- "log 0.4.17",
- "nonzero_ext",
- "reqwest 0.11.11",
- "serde_json",
- "tokio 1.19.2",
- "tokio-tungstenite 0.17.1",
 ]
 
 [[package]]
@@ -2428,7 +2335,7 @@ dependencies = [
  "tokio-threadpool",
  "tokio-timer",
  "url 1.7.2",
- "uuid",
+ "uuid 0.7.4",
  "winreg 0.6.2",
 ]
 
@@ -2849,6 +2756,9 @@ name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"
@@ -3384,9 +3294,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.12"
+version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfbbce75cad20b56f4f4200e413b894c990c7bbd7e47245ff5cbc2b82511e4da"
+checksum = "3a713421342a5a666b7577783721d3117f1b69a393df803ee17bb73b1e122a59"
 dependencies = [
  "ansi_term 0.12.1",
  "matchers",
@@ -3570,6 +3480,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+dependencies = [
+ "getrandom",
+ "rand 0.8.5",
+]
+
+[[package]]
 name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3718,14 +3638,14 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
- "crypto-crawler 4.4.4",
- "crypto-market-type 1.1.0 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-markets 1.2.7",
- "crypto-msg-parser 2.4.12",
- "crypto-msg-type 1.0.7 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-pair 2.2.9",
- "crypto-rest-client 0.9.2 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
- "crypto-ws-client 4.11.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-crawler 4.4.4 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-market-type",
+ "crypto-markets",
+ "crypto-msg-parser 2.4.12 (git+https://github.com/wmjtyd/crypto-crawler-rs)",
+ "crypto-msg-type",
+ "crypto-pair",
+ "crypto-rest-client",
+ "crypto-ws-client",
  "futures 0.3.21",
  "headers",
  "rand 0.8.5",
@@ -3848,22 +3768,24 @@ dependencies = [
 
 [[package]]
 name = "wmjtyd-libstock"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "257b4bb8fc397af3cb8031b719e93f4f38888169ea29bf5e9367a30b2da687ea"
+version = "0.2.0-beta.3"
+source = "git+https://github.com/wmjtyd/libstock#ced2af0a02b259dfb64e21f76a959b05cdfd590b"
 dependencies = [
+ "arrayref",
  "bimap",
  "chrono",
  "concat-string",
- "crypto-crawler 4.4.5",
- "crypto-msg-parser 2.5.4",
+ "crypto-crawler 4.4.4 (git+https://github.com/wmjtyd/crypto-crawler-rs?rev=bb8d89563e6add82a0825f7b2a47d58c42d423cc)",
+ "crypto-msg-parser 2.4.12 (git+https://github.com/wmjtyd/crypto-crawler-rs?rev=bb8d89563e6add82a0825f7b2a47d58c42d423cc)",
  "either",
  "flume",
  "once_cell",
  "rust_decimal",
+ "strum",
  "thiserror",
  "tokio 1.19.2",
  "tracing",
+ "uuid 1.1.2",
 ]
 
 [[package]]

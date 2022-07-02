@@ -32,7 +32,10 @@ rust_decimal = "1.23.1"
 rust_decimal_macros = "1.23.1"
 phf = { version = "0.10.1", features = ["macros"] }
 futures = "0.3.21"
-wmjtyd-libstock = "0.1.0"
+wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", version = "0.2.0-beta.3" }
 tracing = "0.1.35"
 concat-string = "1.0.1"
 thiserror = "1.0.31"
+
+[dev-dependencies]
+tracing-subscriber = "0.3.14"
