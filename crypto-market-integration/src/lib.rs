@@ -1,4 +1,3 @@
-pub(crate) mod data;
 pub(crate) mod misc_crawlers;
 pub(crate) mod writers;
 

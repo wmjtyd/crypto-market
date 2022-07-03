@@ -10,7 +10,7 @@ edition = "2021"
 crypto-crawler = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 crypto-markets = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 crypto-market-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-msg-parser = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-msg-parser = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 crypto-msg-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 crypto-pair = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 crypto-rest-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
@@ -27,7 +27,7 @@ slack-hook = "0.8.0"
 openssl = { version = "0.10", features = ["vendored"] }
 nanomsg = "0.7.2"
 chrono = "0.4.19"
-
+wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", ref = "ced2af0a02b259dfb64e21f76a959b05cdfd590b", version = "0.2.0-beta.3" }
 
 rust_decimal = "1.23.1"
 rust_decimal_macros = "1.23.1"
@@ -35,3 +35,13 @@ phf = { version = "0.10.1", features = ["macros"] }
 futures = "0.3.21"
 
 clap = "~2.27.0"
+
+[dependencies.crypto-msg-parser]
+version = "=2.4.12"
+optional = true
+git = "https://github.com/wmjtyd/crypto-crawler-rs"
+rev = "bb8d89563e6add82a0825f7b2a47d58c42d423cc"
+
+[features]
+default = ["crypto"]
+crypto = ["dep:crypto-msg-parser"]

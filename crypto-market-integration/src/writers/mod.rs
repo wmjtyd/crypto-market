@@ -3,7 +3,6 @@ use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, p
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
 use nanomsg::{Protocol, Socket};
-use redis::{self, Commands};
 
 use std::io::Write;
 use std::{
@@ -11,8 +10,15 @@ use std::{
     sync::{
         mpsc::{Receiver, Sender},
         Arc,
-    },
-    thread::JoinHandle,
+    }
+};
+
+
+use wmjtyd_libstock::data::{
+    bbo::encode_bbo,
+    kline::encode_kline,
+    orderbook::encode_orderbook,
+    trade::encode_trade
 };
 
 pub trait Writer {
@@ -20,47 +26,6 @@ pub trait Writer {
     fn close(&mut self);
 }
 
-use crate::data::{encode_bbo, encode_kline, encode_orderbook, encode_trade};
-
-fn connect_redis(redis_url: &str) -> Result<redis::Connection, redis::RedisError> {
-    assert!(!redis_url.is_empty(), "redis_url is empty");
-
-    let mut redis_error: Option<redis::RedisError> = None;
-    let mut conn: Option<redis::Connection> = None;
-    for _ in 0..3 {
-        match redis::Client::open(redis_url) {
-            Ok(client) => match client.get_connection() {
-                Ok(connection) => {
-                    conn = Some(connection);
-                    break;
-                }
-                Err(err) => redis_error = Some(err),
-            },
-            Err(err) => redis_error = Some(err),
-        }
-    }
-
-    if let Some(connection) = conn {
-        Ok(connection)
-    } else {
-        Err(redis_error.unwrap())
-    }
-}
-
-fn create_redis_writer_thread(rx: Receiver<Arc<Message>>, redis_url: String) -> JoinHandle<()> {
-    std::thread::spawn(move || {
-        let mut redis_conn = connect_redis(&redis_url).unwrap();
-        for msg in rx {
-            let msg_type = msg.msg_type;
-            let s = serde_json::to_string(msg.as_ref()).unwrap();
-            let topic = format!("carbonbot:{}", msg_type);
-            if let Err(err) = redis_conn.publish::<&str, String, i64>(&topic, s) {
-                error!("{}", err);
-                return;
-            }
-        }
-    })
-}
 
 fn writers_key(writers: &mut HashMap<String, Socket>, name: &String) -> String {
     let file_name = name.replacen("\\", "-", 1);
@@ -124,11 +89,11 @@ async fn create_nanomsg_writer_thread(
                     };
 
                     // encode
-                    let bbo_msg_bytes_i8 = encode_bbo(&bbo_msg);
-                    let boo_msg_bytes_u8 =
-                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&bbo_msg_bytes_i8) };
+                    let bbo_msg = encode_bbo(&bbo_msg).unwrap();
+                    
+                    // let bbo_msg_bytes = encode_bbo(&bbo_msg).unwrap();
 
-                    nanomsg_writer.write(boo_msg_bytes_u8).unwrap();
+                    nanomsg_writer.write(&bbo_msg).unwrap();
                 }
                 MessageType::Trade => {
                     let trade = tokio::task::spawn_blocking(move || {
@@ -150,11 +115,9 @@ async fn create_nanomsg_writer_thread(
 
                     let _trade = &trade[0];
                     // encode
-                    let trade_bytes_i8 = encode_trade(&trade[0]);
-                    let trade_bytes_u8 =
-                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&trade_bytes_i8) };
+                    let trade_bytes_u8 = encode_trade(&trade[0]).unwrap();
 
-                    nanomsg_writer.write(trade_bytes_u8).unwrap();
+                    nanomsg_writer.write(&trade_bytes_u8).unwrap();
                 }
                 MessageType::L2Event => {
                     let orderbook = tokio::task::spawn_blocking(move || {
@@ -200,12 +163,9 @@ async fn create_nanomsg_writer_thread(
 
                     let orderbook = &orderbook[0];
                     // encode
-                    let order_book_bytes = encode_orderbook(orderbook);
-                    // send
-                    let order_book_bytes_u8 =
-                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&order_book_bytes) };
-                    // println!("{:?}", String::from_utf8_lossy(order_book_bytes_u8));
-                    nanomsg_writer.write(order_book_bytes_u8).unwrap();
+                    let order_book_bytes = encode_orderbook(orderbook).unwrap();
+
+                    nanomsg_writer.write(&order_book_bytes).unwrap();
                 }
                 MessageType::Candlestick => {
                     let kline_msg = tokio::task::spawn_blocking(move || {
@@ -226,11 +186,9 @@ async fn create_nanomsg_writer_thread(
                     };
 
                     // encode
-                    let kline_msg_bytes_i8 = encode_kline(&kline_msg);
-                    let kline_msg_bytes_u8 =
-                        unsafe { std::mem::transmute::<&[i8], &[u8]>(&kline_msg_bytes_i8) };
+                    let kline_msg_bytes = encode_kline(&kline_msg).unwrap();
 
-                    nanomsg_writer.write(kline_msg_bytes_u8).unwrap();
+                    nanomsg_writer.write(&kline_msg_bytes).unwrap();
                 }
                 _ => panic!("Not implemented"),
             };
@@ -255,25 +213,6 @@ pub fn create_writer_threads(
 ) -> Vec<BoxFuture<'static, ()>> {
     let mut threads = Vec::new();
 
-    // if data_dir.is_none() && redis_url.is_none() {
-    //     error!("Both DATA_DIR and REDIS_URL are not set");
-    //     return threads;
-    // }
-
-    // if data_dir.is_some() && redis_url.is_some() {
-    //     // channel for Redis
-    //     let (tx_redis, rx_redis) = std::sync::mpsc::channel::<Message>();
-    //     threads.push(create_file_writer_thread(
-    //         rx,
-    //         data_dir.unwrap(),
-    //         Some(tx_redis),
-    //     ));
-    //     threads.push(create_redis_writer_thread(rx_redis, redis_url.unwrap()));
-    // } else if data_dir.is_some() {
-    //     threads.push(create_file_writer_thread(rx, data_dir.unwrap(), None))
-    // } else {
-    //     threads.push(create_redis_writer_thread(rx, redis_url.unwrap()));
-    // }
     threads.push(
         create_nanomsg_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed(),
     );

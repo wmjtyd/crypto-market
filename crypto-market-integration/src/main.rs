@@ -107,10 +107,6 @@ pub async fn crawl(
     }
 }
 
-async fn reload_loop(func: impl Future<Output = ()>) {
-    func.await;
-}
-
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     env_logger::init();
