@@ -16,6 +16,16 @@ tokio = { version = "0.2", features = ["full"] }
 clap = "~2.27.0"
 env_logger = "0.4.3"
 url = "1"
-# carbonbot = { path = "../crypto-market-integration"}
+rustls = "0.20.6"
+wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", version = "0.2.0-beta.2" }
 
-[dev-dependencies]
+
+[dependencies.crypto-msg-parser]
+version = "=2.4.12"
+optional = true
+git = "https://github.com/wmjtyd/crypto-crawler-rs"
+rev = "bb8d89563e6add82a0825f7b2a47d58c42d423cc"
+
+[features]
+default = ["crypto"]
+crypto = ["dep:crypto-msg-parser"]

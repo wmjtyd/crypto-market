@@ -1,14 +1,13 @@
 use std::{
-    cell::RefCell,
     collections::{HashMap, HashSet},
     io::Read,
     net::{self, SocketAddr},
-    sync::{mpsc, Arc, Mutex},
+    sync::{Arc, Mutex},
     thread,
-    time::Duration,
 };
 
-use mio::net::UdpSocket;
+use mio::{net::UdpSocket};
+use mio::Poll;
 use nanomsg::{Protocol, Socket};
 use quiche::Config;
 use ring::rand::SystemRandom;
@@ -21,7 +20,6 @@ extern crate log;
 
 type ClientList = HashMap<quiche::ConnectionId<'static>, Client>;
 type ClientSubscribe = HashMap<String, HashSet<quiche::ConnectionId<'static>>>;
-type CLientChannelSubscribe = ((String, String), quiche::ConnectionId<'static>);
 
 lazy_static! {
     static ref CLIENT_LIST: Mutex<ClientList> = {
@@ -32,46 +30,6 @@ lazy_static! {
         let map: ClientSubscribe = HashMap::new();
         Mutex::new(map)
     };
-    static ref SERVER_CHANNEL_SUBSCRIBE: ServerSubscribe = {
-        let (send, revc) = mpsc::channel::<CLientChannelSubscribe>();
-        ServerSubscribe {
-            send: Arc::new(Mutex::new(send)),
-            recv: Arc::new(Mutex::new(revc)),
-        }
-    };
-    static ref SERVER: Server = {
-        let mut socket = mio::net::UdpSocket::bind("127.0.0.1:4433".parse().unwrap()).unwrap();
-        let poll = mio::Poll::new().unwrap();
-        poll.registry()
-            .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
-            .unwrap();
-
-        Server {
-            socket: Arc::new(socket),
-            poll: Mutex::new(RefCell::new(poll)),
-        }
-    };
-}
-
-struct ServerSubscribe {
-    send: Arc<Mutex<mpsc::Sender<CLientChannelSubscribe>>>,
-    recv: Arc<Mutex<mpsc::Receiver<CLientChannelSubscribe>>>,
-}
-
-struct Server {
-    socket: Arc<UdpSocket>,
-    poll: Mutex<RefCell<mio::Poll>>,
-}
-
-impl Server {
-    pub fn event_poll(&self, events: &mut mio::Events, timeout: Option<Duration>) {
-        self.poll
-            .lock()
-            .unwrap()
-            .get_mut()
-            .poll(events, timeout)
-            .unwrap();
-    }
 }
 
 struct PartialResponse {
@@ -94,23 +52,16 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
         .register(&mut socket, mio::Token(0), mio::Interest::READABLE)
         .unwrap();
 
-    let server = Server {
-        socket: Arc::new(socket),
-        poll: Mutex::new(RefCell::new(poll)),
-    };
+    let socket = Arc::new(socket);
 
-    let server = Arc::new(server);
+    let ipcs= vec![ipc];
 
-    let server_r = server.clone();
+    // 套字节
+    let socket_clone = socket.clone();
 
     // 连接初始
     service.push(thread::spawn(move || {
-        server_connection(server_r, config);
-    }));
-
-    // 订阅
-    service.push(thread::spawn(|| {
-        server_subscribe();
+        server_connection(poll, socket_clone, config);
     }));
 
     // 存活检查
@@ -118,10 +69,10 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
         server_alive_check();
     }));
 
-    let server_r = server.clone();
+    let socket_clone = socket.clone();
     // 发送
     service.push(thread::spawn(|| {
-        server_send(ipc, server_r);
+        server_send(ipcs, socket_clone);
     }));
 
     for s in service {
@@ -130,20 +81,18 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
     }
 }
 
-fn server_connection(server: Arc<Server>, mut config: Config) {
+fn server_connection(mut poll: mio::Poll, socket: Arc<UdpSocket>, mut config: Config) {
     let mut buf = [0; 65535];
     let mut out = [0; MAX_DATAGRAM_SIZE];
 
     let mut events = mio::Events::with_capacity(1024);
-
-    let socket = server.socket.clone();
 
     let rng = SystemRandom::new();
     let conn_id_seed = ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &rng).unwrap();
 
     debug!("start server");
     loop {
-        server.event_poll(&mut events, None);
+        poll.poll(&mut events, None).unwrap();
         debug!("event! --> {:?}", events);
 
         'read: loop {
@@ -311,14 +260,19 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
 
             debug!("{} processed {} bytes", client.conn.trace_id(), read);
 
+
+            println!("is !!!!!!!!!!!!!");
             if client.conn.is_in_early_data() || client.conn.is_established() {
                 // Handle writable streams.
+                println!("is !!!!!!!!!!!!!");
                 for stream_id in client.conn.writable() {
+                    debug!("writable????");
                     handle_writable(client, stream_id);
                 }
 
                 // Process all readable streams.
                 for s in client.conn.readable() {
+                    debug!("readable");
                     while let Ok((read, fin)) = client.conn.stream_recv(s, &mut buf) {
                         debug!("{} received {} bytes", client.conn.trace_id(), read);
 
@@ -332,43 +286,11 @@ fn server_connection(server: Arc<Server>, mut config: Config) {
                             fin
                         );
 
-                        handle_stream(client, s, stream_buf, client_cid.clone());
+                        handle_sub(client, s, stream_buf, client_cid.clone());
                     }
                 }
             }
-            send(client, socket.clone(), &mut out);
-        }
-    }
-}
-
-fn server_subscribe() {
-    loop {
-        let ((action, sub_key), cid) = SERVER_CHANNEL_SUBSCRIBE
-            .recv
-            .lock()
-            .unwrap()
-            .recv()
-            .unwrap();
-        let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
-        let action = &action[..];
-        match action {
-            "ADD" => {
-                if let Some(v) = client_sub_lock.get_mut(&sub_key) {
-                    debug!("客户端订阅成功 {:?}", cid);
-                    v.insert(cid);
-                } else {
-                    warn!("不存在的订阅");
-                }
-            }
-            "RM" => {
-                if let Some(v) = client_sub_lock.get_mut(&sub_key) {
-                    v.remove(&cid);
-                    debug!("客户端取消订阅成功 {:?}", cid);
-                } else {
-                    warn!("不存在的订阅");
-                }
-            }
-            _ => continue,
+            send_package(client, socket.clone(), &mut out);
         }
     }
 }
@@ -402,19 +324,23 @@ fn server_alive_check() {
     }
 }
 
-fn server_send(ipc: String, server: Arc<Server>) {
-    let url = format!("ipc:///tmp/{}.ipc", ipc);
+fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
 
     let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
 
+    for ipc in ipcs {
     client_sub_lock.insert(ipc, HashSet::new());
+    }
+    // client_sub_lock.extend(iter)
 
-    debug!("{}", url);
 
     for topic in client_sub_lock.keys() {
+        let url = format!("ipc:///tmp/{}.ipc", topic);
         let topic = topic.to_owned();
         let url = url.to_string();
-        let server_r = server.clone();
+        let network_socket = socket.clone();
+
+        debug!("{}", url);
         thread::spawn(move || {
             let mut socket = Socket::new(Protocol::Sub).unwrap();
             let setopt = socket.subscribe("".as_bytes());
@@ -429,7 +355,8 @@ fn server_send(ipc: String, server: Arc<Server>) {
             loop {
                 match socket.read_to_end(&mut buf) {
                     Ok(buf_size) => {
-                        distribute(server_r.clone(), topic.to_string(), &buf[..buf_size]);
+                        debug!("sub data len: {}", buf.len());
+                        distribute(network_socket.clone(), topic.to_string(), &buf[..buf_size]);
                         buf.clear();
                     }
                     Err(err) => {
@@ -443,8 +370,7 @@ fn server_send(ipc: String, server: Arc<Server>) {
     }
 }
 
-fn distribute(server: Arc<Server>, key: String, data: &[u8]) {
-    let socket = server.socket.clone();
+fn distribute(socket: Arc<UdpSocket>, key: String, data: &[u8]) {
     let client_sub = match CLIENT_SUBSCRIBE.lock() {
         Ok(v) => v,
         Err(_) => return,
@@ -455,6 +381,7 @@ fn distribute(server: Arc<Server>, key: String, data: &[u8]) {
     };
     let mut clients = CLIENT_LIST.lock().unwrap();
     let mut out = [0u8; 1024];
+    
     for cid in sub {
         let client = clients.get_mut(&cid).unwrap();
 
@@ -466,12 +393,12 @@ fn distribute(server: Arc<Server>, key: String, data: &[u8]) {
             }
 
             info!("send client cid: {:?}", cid);
-            send(client, socket.clone(), &mut out);
+            send_package(client, socket.clone(), &mut out);
         }
     }
 }
 
-fn send(client: &mut Client, socket: Arc<UdpSocket>, out: &mut [u8]) {
+fn send_package(client: &mut Client, socket: Arc<UdpSocket>, out: &mut [u8]) {
     loop {
         let (write, send_info) = match client.conn.send(out) {
             Ok(v) => v,
@@ -488,6 +415,7 @@ fn send(client: &mut Client, socket: Arc<UdpSocket>, out: &mut [u8]) {
                 break;
             }
         };
+        println!("send");
 
         if let Err(e) = socket.send_to(&out[..write], send_info.to) {
             if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -573,39 +501,65 @@ fn handle_writable(client: &mut Client, stream_id: u64) {
     }
 }
 
-fn handle_stream(
-    _client: &mut Client,
-    _stream_id: u64,
+fn handle_sub(
+    client: &mut Client,
+    write_stream_id: u64,
     buf: &[u8],
     cid: quiche::ConnectionId<'static>,
 ) {
-    let command = if let Ok(v) = String::from_utf8(buf.to_vec()) {
+    let actions = if let Ok(v) = String::from_utf8(buf.to_vec()) {
         v
     } else {
         return;
     };
+    debug!("{}", actions);
 
-    if let Some(_v) = command.find(";") {
-        let commands: Vec<&str> = command.split(";").collect();
-        let send_lock = SERVER_CHANNEL_SUBSCRIBE.send.lock().unwrap();
-        for i in commands {
-            if let Some(num) = i.find(" ") {
-                let data = (
-                    (command[..num].to_string(), i[num + 1..].to_string()),
-                    cid.clone(),
-                );
-                debug!("{:?}", data);
-                send_lock.send(data).unwrap();
+    let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
+
+    // sub@xxx_xxx
+    //  or
+    // sub@xxx_xx;sub@xxx_xxx
+    for action  in actions.split(";").into_iter() {
+        let command: Vec<&str> = action.split("@").collect();
+        if command.len() != 2 {
+            break;
             }
+
+        let msg = match command[0] {
+            "sub" => {
+                if let Some(client_sub_list) = client_sub_lock.get_mut(command[1]) {
+                    debug!("{:?} sub {}", cid, command[1]);
+                    client_sub_list.insert(cid.clone());
+                    Ok("Success sub")
+                } else {
+                    Err("Subscription does not exist")
         }
+            },
+            "unsub" => {
+                if let Some(client_sub_list) = client_sub_lock.get_mut(command[1]) {
+                    client_sub_list.remove(&cid);
+                    debug!("{:?} unsub {}", cid, command[1]);
+                    Ok("Success nusub")
     } else {
-        if let Some(num) = command.find(" ") {
-            let data = (
-                (command[..num].to_string(), command[num + 1..].to_string()),
-                cid.clone(),
-            );
-            let send_lock = SERVER_CHANNEL_SUBSCRIBE.send.lock().unwrap();
-            send_lock.send(data).unwrap();
+                    Err("Subscription does not exist")
+                }
+            }
+            _ => {
+                Err("error: Non-existent Action")
+            }
+        };
+        match msg {
+            Err(msg) => {
+                let msg = format!("ERROR: {}", msg);
+                _ = client.conn.stream_send(
+                    write_stream_id,
+                    msg.as_bytes(),
+                    false);
+                warn!("cid: {:?}; {}", cid,msg);
+            }
+            Ok(msg) => {
+                debug!("cid: {:?}; {}", cid, msg)
+            }
         }
     }
 }

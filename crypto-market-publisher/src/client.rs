@@ -2,17 +2,25 @@ extern crate log;
 
 use std::{
     net::{SocketAddr, ToSocketAddrs},
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{mpsc::{channel, Receiver, Sender}, Arc},
 };
 
 use quiche::Config;
 use ring::rand::*;
 
+use crate::msg_type::Code;
+
 // const MAX_DATAGRAM_SIZE: usize = 1350;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
-fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx: Sender<Vec<i8>>) {
+pub fn client<T>(
+    msg: &'static dyn Code<T>,
+    addr: SocketAddr,
+    mut config: Config, 
+    subscribe_list: Vec<String>, 
+    tx: Sender<T>
+) {
     let mut buf = [0; 65535];
     let mut out = [0; 1350];
 
@@ -146,7 +154,7 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
             debug!("sending sub {:?}", subscribe_list);
             let mut data = Vec::new();
             for sub in &subscribe_list {
-                data.extend_from_slice(&format!("ADD {};", sub).as_bytes());
+                data.extend_from_slice(&format!("sub@{};", sub).as_bytes());
             }
 
             debug!("{:?}", String::from_utf8(data[..data.len() - 1].to_vec()));
@@ -167,9 +175,8 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
 
                 debug!("stream {} has {} bytes (fin? {})", s, stream_buf.len(), fin);
 
-                let stream_buf_i8: &[i8] = unsafe { std::mem::transmute(stream_buf) };
 
-                if tx.send(stream_buf_i8.to_vec()).is_err() {
+                if tx.send(msg.decode(stream_buf)).is_err() {
                     return;
                 };
 
@@ -223,15 +230,15 @@ fn client(addr: SocketAddr, mut config: Config, subscribe_list: Vec<String>, tx:
     }
 }
 
-pub fn start_client(
-    addr: SocketAddr,
-    config: Config,
-    subscribe_list: Vec<&str>,
-) -> Receiver<Vec<i8>> {
-    let (tx, rx) = channel::<Vec<i8>>();
-    let subscribe_list: Vec<String> = subscribe_list.into_iter().map(|e| e.to_string()).collect();
-    tokio::task::spawn(async move {
-        client(addr, config, subscribe_list, tx.clone());
-    });
-    rx
+macro_rules! start_client {
+    ($msg_type: ident, $addr:ident, $config:ident, $subscribe:ident) => {{
+
+        let (tx, rx) = std::sync::mpsc::channel::<$msg_type>();
+        let subscribe_list: Vec<String> = $subscribe.into_iter().map(|e| e.to_string()).collect();
+
+        tokio::task::spawn(async move {
+            client::client(&msg_type::Msg::<$msg_type>(None), $addr, $config, subscribe_list, tx);
+        });
+        rx
+    }}
 }

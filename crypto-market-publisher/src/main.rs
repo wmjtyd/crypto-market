@@ -1,10 +1,16 @@
+#[macro_use]
 mod client;
 mod server;
+
+#[macro_use]
+pub mod msg_type;
 
 use std::net::SocketAddr;
 
 use clap::{clap_app, ArgMatches};
+use crypto_msg_parser::BboMsg;
 use server::create_server;
+
 
 #[macro_use]
 extern crate lazy_static;
@@ -100,9 +106,12 @@ fn start_client(m: &ArgMatches) {
     config.set_initial_max_streams_uni(100);
     config.set_disable_active_migration(true);
 
-    let rx = client::start_client(addr, config, subscribe_list);
-    for _i in rx.iter() {
+
+    let rx = start_client!(BboMsg, addr, config, subscribe_list);
+    for i in rx.iter() {
         // decode space
+        println!("{:?}", i.exchange);
+        println!("{}", i.msg_type);
     }
 }
 
