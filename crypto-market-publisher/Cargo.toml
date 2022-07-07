@@ -17,8 +17,7 @@ clap = "~2.27.0"
 env_logger = "0.4.3"
 url = "1"
 rustls = "0.20.6"
-wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", version = "0.2.0-beta.2" }
-
+wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", branch="staging-0.3.0b2" }
 
 [dependencies.crypto-msg-parser]
 version = "=2.4.12"

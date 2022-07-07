@@ -18,7 +18,7 @@ use wmjtyd_libstock::data::{
     bbo::encode_bbo,
     kline::encode_kline,
     orderbook::encode_orderbook,
-    trade::encode_trade
+    trade::encode_trade,
 };
 
 pub trait Writer {
@@ -90,8 +90,6 @@ async fn create_nanomsg_writer_thread(
 
                     // encode
                     let bbo_msg = encode_bbo(&bbo_msg).unwrap();
-                    
-                    // let bbo_msg_bytes = encode_bbo(&bbo_msg).unwrap();
 
                     nanomsg_writer.write(&bbo_msg).unwrap();
                 }
@@ -137,9 +135,12 @@ async fn create_nanomsg_writer_thread(
                         continue;
                     };
 
-                    let _orderbook = &orderbook[0];
+                    let order_book_msg = &orderbook[0];
+                    let order_book_msg_u8 = 
+                        encode_orderbook(&order_book_msg).unwrap();
+
                     // encode
-                    nanomsg_writer.write(s.as_bytes()).unwrap();
+                    nanomsg_writer.write(&order_book_msg_u8).unwrap();
                 }
                 MessageType::L2TopK => {
                     let received_at = msg.received_at as i64;
@@ -162,6 +163,7 @@ async fn create_nanomsg_writer_thread(
                     };
 
                     let orderbook = &orderbook[0];
+
                     // encode
                     let order_book_bytes = encode_orderbook(orderbook).unwrap();
 

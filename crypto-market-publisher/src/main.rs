@@ -2,13 +2,11 @@
 mod client;
 mod server;
 
-#[macro_use]
-pub mod msg_type;
 
 use std::net::SocketAddr;
 
 use clap::{clap_app, ArgMatches};
-use crypto_msg_parser::BboMsg;
+
 use server::create_server;
 
 
@@ -107,11 +105,10 @@ fn start_client(m: &ArgMatches) {
     config.set_disable_active_migration(true);
 
 
-    let rx = start_client!(BboMsg, addr, config, subscribe_list);
+    let rx = client::create_client(addr, config, ipc);
     for i in rx.iter() {
         // decode space
-        println!("{:?}", i.exchange);
-        println!("{}", i.msg_type);
+        println!("{:?}", i);
     }
 }
 

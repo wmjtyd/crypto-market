@@ -8,18 +8,16 @@ use std::{
 use quiche::Config;
 use ring::rand::*;
 
-use crate::msg_type::Code;
 
 // const MAX_DATAGRAM_SIZE: usize = 1350;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
-pub fn client<T>(
-    msg: &'static dyn Code<T>,
+pub fn client(
     addr: SocketAddr,
     mut config: Config, 
     subscribe_list: Vec<String>, 
-    tx: Sender<T>
+    tx: Sender<Vec<u8>>
 ) {
     let mut buf = [0; 65535];
     let mut out = [0; 1350];
@@ -176,9 +174,7 @@ pub fn client<T>(
                 debug!("stream {} has {} bytes (fin? {})", s, stream_buf.len(), fin);
 
 
-                if tx.send(msg.decode(stream_buf)).is_err() {
-                    return;
-                };
+                tx.send(stream_buf.to_vec());
 
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.
@@ -230,15 +226,16 @@ pub fn client<T>(
     }
 }
 
-macro_rules! start_client {
-    ($msg_type: ident, $addr:ident, $config:ident, $subscribe:ident) => {{
 
-        let (tx, rx) = std::sync::mpsc::channel::<$msg_type>();
-        let subscribe_list: Vec<String> = $subscribe.into_iter().map(|e| e.to_string()).collect();
-
-        tokio::task::spawn(async move {
-            client::client(&msg_type::Msg::<$msg_type>(None), $addr, $config, subscribe_list, tx);
-        });
-        rx
-    }}
+pub fn create_client(
+    addr: SocketAddr,
+    config: Config, 
+    ipc: String, 
+) -> Receiver<Vec<u8>> {
+    let (tx, rx) = channel();
+    let subscribe_list = vec![ipc];
+    tokio::task::spawn(async move {
+        client(addr, config, subscribe_list, tx);
+    });
+    rx
 }
