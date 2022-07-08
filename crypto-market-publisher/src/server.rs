@@ -342,14 +342,8 @@ fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
 
         debug!("{}", url);
         thread::spawn(move || {
-            let mut socket = Socket::new(Protocol::Sub).unwrap();
-            let setopt = socket.subscribe("".as_bytes());
-            let mut endpoint = socket.connect(&url).unwrap();
-
-            match setopt {
-                Ok(_) => debug!("Subscribed to '{:?}'.", topic),
-                Err(err) => error!("Client failed to subscribe '{}'.", err),
-            }
+            let mut socket = wmjtyd_libstock::message::nanomsg::Nanomsg::new_subscribe(url.as_str()).unwrap();
+            socket.subscribe(b"").unwrap();
 
             let mut buf: Vec<u8> = Vec::new();
             loop {
@@ -365,7 +359,6 @@ fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
                     }
                 }
             }
-            endpoint.shutdown().unwrap();
         });
     }
 }

@@ -27,14 +27,8 @@ pub async fn create_write_file_thread(
         let mut data_writer = DataWriter::new();
         data_writer.start().await?;
     
-        let mut socket =
-            Socket::new(Protocol::Sub).map_err(RecorderWriterError::SocketCreationFailed)?;
-        socket
-            .subscribe(b"")
-            .map_err(RecorderWriterError::SocketCreationFailed)?;
-        let mut endpoint = socket
-            .connect(&ipc_exchange_market_type_msg_type)
-            .map_err(RecorderWriterError::SocketConnectionFailed)?;
+        let mut socket = wmjtyd_libstock::message::nanomsg::Nanomsg::new_subscribe(&ipc_exchange_market_type_msg_type.as_str()).unwrap();
+        socket.subscribe(b"").unwrap();
 
         tokio::task::spawn_blocking(move || loop {
             // 数据 payload
@@ -59,9 +53,6 @@ pub async fn create_write_file_thread(
             }
         }).await?;
 
-        endpoint
-            .shutdown()
-            .map_err(RecorderWriterError::SocketShutdownFailed)?;
 
         Ok::<(), RecorderWriterError>(())
     };

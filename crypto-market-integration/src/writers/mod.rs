@@ -3,8 +3,9 @@ use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, p
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
 use nanomsg::{Protocol, Socket};
-
 use std::io::Write;
+
+type Subscribe = dyn std::io::Write;
 use std::{
     collections::HashMap,
     sync::{
@@ -27,22 +28,21 @@ pub trait Writer {
 }
 
 
-fn writers_key(writers: &mut HashMap<String, Socket>, name: &String) -> String {
-    let file_name = name.replacen("\\", "-", 1);
+fn create(name: &String) -> impl std::io::Write {
+    let file_name = name.replacen("/", "-", 1);
 
-    if !writers.contains_key(&file_name) {
-        let ipc_exchange_market_type_msg_type = file_name.replacen(".", "_", 4);
-        let ipc_exchange_market_type_msg_type =
-            format!("ipc:///tmp/{}.ipc", ipc_exchange_market_type_msg_type);
-        debug!("{}", ipc_exchange_market_type_msg_type);
-        let mut socket = Socket::new(Protocol::Pub).unwrap();
-        let _endpoint = socket
-            .bind(ipc_exchange_market_type_msg_type.as_str())
-            .unwrap();
+    let ipc_exchange_market_type_msg_type =
+        format!("ipc:///tmp/{}.ipc", file_name);
 
-        writers.insert(file_name.clone(), socket);
-    }
-    file_name
+    let socket = wmjtyd_libstock::message::nanomsg::Nanomsg::new_publish(&ipc_exchange_market_type_msg_type).unwrap(); 
+    // debug!("{}", ipc_exchange_market_type_msg_type);
+    // let mut socket = Socket::new(Protocol::Pub).unwrap();
+    // let _endpoint = socket
+    //     .bind(ipc_exchange_market_type_msg_type.as_str())
+    //     .unwrap();
+
+
+    socket
 }
 
 async fn create_nanomsg_writer_thread(
@@ -54,7 +54,14 @@ async fn create_nanomsg_writer_thread(
     period: Arc<String>,
 ) {
     tokio::task::spawn(async move {
-        let mut writers: HashMap<String, Socket> = HashMap::new();
+        let mut writers= HashMap::new();
+
+
+        // let get = |h| {
+
+        // };
+        // get(writers);
+
         for msg in rx {
             debug!("msg ->> yes");
             let msg = Arc::new(msg);
@@ -77,21 +84,23 @@ async fn create_nanomsg_writer_thread(
                     .await
                     .unwrap();
 
+
                     let key = format!(
-                        "{}.{}.{}.{}",
+                        "{}_{}_{}_{}",
                         msg.exchange, msg.market_type, msg.msg_type, bbo_msg.symbol
                     );
-                    let key = writers_key(&mut writers, &key);
-                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
-                        v
+                    let nanomsg_writer = if writers.contains_key(&key) {
+                        writers.get_mut(&key).unwrap()
                     } else {
-                        continue;
+                        let socket = create(&key);
+                        writers.insert(key.to_owned(), socket);
+                        writers.get_mut(&key).unwrap()
                     };
 
-                    // encode
-                    let bbo_msg = encode_bbo(&bbo_msg).unwrap();
+                    let bbo_msg_byte = encode_bbo(&bbo_msg).unwrap();
 
-                    nanomsg_writer.write(&bbo_msg).unwrap();
+                    // encode
+                    nanomsg_writer.write(&bbo_msg_byte).unwrap();
                 }
                 MessageType::Trade => {
                     let trade = tokio::task::spawn_blocking(move || {
@@ -101,14 +110,15 @@ async fn create_nanomsg_writer_thread(
                     .unwrap();
 
                     let key = format!(
-                        "{}.{}.{}.{}",
+                        "{}_{}_{}_{}",
                         msg.exchange, msg.market_type, msg.msg_type, trade[0].symbol
                     );
-                    let key = writers_key(&mut writers, &key);
-                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
-                        v
+                    let nanomsg_writer = if writers.contains_key(&key) {
+                        writers.get_mut(&key).unwrap()
                     } else {
-                        continue;
+                        let socket = create(&key);
+                        writers.insert(key.to_owned(), socket);
+                        writers.get_mut(&key).unwrap()
                     };
 
                     let _trade = &trade[0];
@@ -125,14 +135,15 @@ async fn create_nanomsg_writer_thread(
                     .unwrap();
 
                     let key = format!(
-                        "{}.{}.{}.{}",
+                        "{}_{}_{}_{}",
                         msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol
                     );
-                    let key = writers_key(&mut writers, &key);
-                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
-                        v
+                    let nanomsg_writer = if writers.contains_key(&key) {
+                        writers.get_mut(&key).unwrap()
                     } else {
-                        continue;
+                        let socket = create(&key);
+                        writers.insert(key.to_owned(), socket);
+                        writers.get_mut(&key).unwrap()
                     };
 
                     let order_book_msg = &orderbook[0];
@@ -152,14 +163,15 @@ async fn create_nanomsg_writer_thread(
                     .unwrap();
 
                     let key = format!(
-                        "{}.{}.{}.{}",
+                        "{}_{}_{}_{}",
                         msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol
                     );
-                    let key = writers_key(&mut writers, &key);
-                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
-                        v
+                    let nanomsg_writer = if writers.contains_key(&key) {
+                        writers.get_mut(&key).unwrap()
                     } else {
-                        continue;
+                        let socket = create(&key);
+                        writers.insert(key.to_owned(), socket);
+                        writers.get_mut(&key).unwrap()
                     };
 
                     let orderbook = &orderbook[0];
@@ -177,14 +189,15 @@ async fn create_nanomsg_writer_thread(
                     .unwrap();
 
                     let key = format!(
-                        "{}.{}.{}.{}.{}",
+                        "{}_{}_{}_{}_{}",
                         msg.exchange, msg.market_type, msg.msg_type, kline_msg.symbol, period
                     );
-                    let key = writers_key(&mut writers, &key);
-                    let nanomsg_writer = if let Some(v) = writers.get_mut(&key) {
-                        v
+                    let nanomsg_writer = if writers.contains_key(&key) {
+                        writers.get_mut(&key).unwrap()
                     } else {
-                        continue;
+                        let socket = create(&key);
+                        writers.insert(key.to_owned(), socket);
+                        writers.get_mut(&key).unwrap()
                     };
 
                     // encode
