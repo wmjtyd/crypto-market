@@ -2,7 +2,7 @@ extern crate log;
 
 use std::{
     net::{SocketAddr, ToSocketAddrs},
-    sync::{mpsc::{channel, Receiver, Sender}, Arc},
+    sync::{mpsc::{channel, Receiver, Sender}},
 };
 
 use quiche::Config;
@@ -174,7 +174,7 @@ pub fn client(
                 debug!("stream {} has {} bytes (fin? {})", s, stream_buf.len(), fin);
 
 
-                tx.send(stream_buf.to_vec());
+                tx.send(stream_buf.to_vec()).expect("send error");
 
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.

@@ -11,20 +11,19 @@ mio = { version = "0.8", features = ["net", "os-poll"] }
 ring = "0.16"
 lazy_static = "1"
 log = { version = "0.4", features = ["std"] }
-nanomsg = "0.7.2"
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1.18.2", features = ["rt-multi-thread",  "time", "sync", "macros"] }
 clap = "~2.27.0"
 env_logger = "0.4.3"
 url = "1"
 rustls = "0.20.6"
-wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", branch="staging-0.3.0b2" }
 
 [dependencies.crypto-msg-parser]
-version = "=2.4.12"
-optional = true
+version = "=2.6.2"
 git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "bb8d89563e6add82a0825f7b2a47d58c42d423cc"
+rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
 
-[features]
-default = ["crypto"]
-crypto = ["dep:crypto-msg-parser"]
+[dependencies.wmjtyd-libstock]
+git = "https://github.com/wmjtyd/libstock.git"
+default-features = false
+features = ["crypto", "zeromq", "slack"]
+branch = "staging-0.3.0b3"

@@ -12,14 +12,12 @@ tracing = "0.1"
 tracing-subscriber = { version="0.3", features = ["env-filter"] }
 tower-http = { version = "0.2.0", features = ["fs", "trace"] }
 headers = "0.3"
-crypto-crawler = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-markets = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-market-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-msg-parser = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-msg-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-pair = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-rest-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-ws-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-markets = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-market-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-msg-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-pair = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-rest-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
+# crypto-ws-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 chrono = "0.4.19"
 rust_decimal = "1.23.1"
 rust_decimal_macros = "1.23.1"
@@ -30,3 +28,11 @@ serde_derive = "1.0.81"
 rand = "0.8.5"
 futures = "0.3.21"
 toml = "0.5.9"
+
+[dependencies.crypto-crawler]
+git = "https://github.com/wmjtyd/crypto-crawler-rs"
+rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
+
+[dependencies.crypto-msg-parser]
+git = "https://github.com/wmjtyd/crypto-crawler-rs"
+rev = "d41482af5fc33797ee12c54da809b660850d2ab2"

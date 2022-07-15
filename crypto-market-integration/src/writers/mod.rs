@@ -2,10 +2,10 @@ use crypto_crawler::*;
 use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
-use nanomsg::{Protocol, Socket};
-use std::io::Write;
+use tokio::io::AsyncWriteExt;
+use wmjtyd_libstock::message::zeromq::Pub;
+use wmjtyd_libstock::message::zeromq::Zeromq;
 
-type Subscribe = dyn std::io::Write;
 use std::{
     collections::HashMap,
     sync::{
@@ -28,24 +28,22 @@ pub trait Writer {
 }
 
 
-fn create(name: &String) -> impl std::io::Write {
-    let file_name = name.replacen("/", "-", 1);
+// Quickly create a message queue
+async fn create(name: &String) -> impl tokio::io::AsyncWriteExt  {
+    let file_name = name.replacen("/", "-", 3);
 
     let ipc_exchange_market_type_msg_type =
         format!("ipc:///tmp/{}.ipc", file_name);
-
-    let socket = wmjtyd_libstock::message::nanomsg::Nanomsg::new_publish(&ipc_exchange_market_type_msg_type).unwrap(); 
-    // debug!("{}", ipc_exchange_market_type_msg_type);
-    // let mut socket = Socket::new(Protocol::Pub).unwrap();
-    // let _endpoint = socket
-    //     .bind(ipc_exchange_market_type_msg_type.as_str())
-    //     .unwrap();
-
-
+    
+    let socket = if let Ok(v) = Zeromq::<Pub>::new(&ipc_exchange_market_type_msg_type).await {
+        v
+    } else {
+        panic!("init publish error: {}", ipc_exchange_market_type_msg_type);
+    };
     socket
 }
 
-async fn create_nanomsg_writer_thread(
+async fn create_writer_thread(
     rx: Receiver<Message>,
     tx_redis: Option<Sender<Arc<Message>>>,
     exchange: &'static str,
@@ -55,20 +53,14 @@ async fn create_nanomsg_writer_thread(
 ) {
     tokio::task::spawn(async move {
         let mut writers= HashMap::new();
-
-
-        // let get = |h| {
-
-        // };
-        // get(writers);
+        let mut data_vec = Vec::new();
 
         for msg in rx {
             debug!("msg ->> yes");
             let msg = Arc::new(msg);
-
-            let s = serde_json::to_string(msg.as_ref()).unwrap();
-
             let msg_r = msg.clone();
+
+            // Convert the message to &[u8]
             match msg_type {
                 MessageType::BBO => {
                     let received_at = msg_r.received_at;
@@ -85,50 +77,26 @@ async fn create_nanomsg_writer_thread(
                     .unwrap();
 
 
-                    let key = format!(
-                        "{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, bbo_msg.symbol
-                    );
-                    let nanomsg_writer = if writers.contains_key(&key) {
-                        writers.get_mut(&key).unwrap()
-                    } else {
-                        let socket = create(&key);
-                        writers.insert(key.to_owned(), socket);
-                        writers.get_mut(&key).unwrap()
-                    };
-
-                    let bbo_msg_byte = encode_bbo(&bbo_msg).unwrap();
-
-                    // encode
-                    nanomsg_writer.write(&bbo_msg_byte).unwrap();
+                    let symbol = bbo_msg.symbol.to_owned();
+                    let byte_data = encode_bbo(&bbo_msg).unwrap();
+                    data_vec.push((symbol, byte_data));
                 }
                 MessageType::Trade => {
-                    let trade = tokio::task::spawn_blocking(move || {
+                    let trade_msg = tokio::task::spawn_blocking(move || {
                         parse_trade(exchange, MarketType::Spot, &msg_r.json).unwrap()
                     })
                     .await
                     .unwrap();
 
-                    let key = format!(
-                        "{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, trade[0].symbol
-                    );
-                    let nanomsg_writer = if writers.contains_key(&key) {
-                        writers.get_mut(&key).unwrap()
-                    } else {
-                        let socket = create(&key);
-                        writers.insert(key.to_owned(), socket);
-                        writers.get_mut(&key).unwrap()
-                    };
 
-                    let _trade = &trade[0];
-                    // encode
-                    let trade_bytes_u8 = encode_trade(&trade[0]).unwrap();
-
-                    nanomsg_writer.write(&trade_bytes_u8).unwrap();
+                    for trdate in trade_msg {
+                        let symbol = trdate.symbol.to_owned();
+                        let byte_data = encode_trade(&trdate).unwrap();
+                        data_vec.push((symbol, byte_data));
+                    }
                 }
                 MessageType::L2Event => {
-                    let orderbook = tokio::task::spawn_blocking(move || {
+                    let orderbook_msg = tokio::task::spawn_blocking(move || {
                         parse_l2(exchange, MarketType::Spot, &msg_r.json, None).unwrap()
                     })
                     .await
@@ -136,50 +104,36 @@ async fn create_nanomsg_writer_thread(
 
                     let key = format!(
                         "{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol
+                        msg.exchange, msg.market_type, msg.msg_type, orderbook_msg[0].symbol
                     );
-                    let nanomsg_writer = if writers.contains_key(&key) {
+                    let writer_mq = if writers.contains_key(&key) {
                         writers.get_mut(&key).unwrap()
                     } else {
-                        let socket = create(&key);
+                        let socket = create(&key).await;
                         writers.insert(key.to_owned(), socket);
                         writers.get_mut(&key).unwrap()
                     };
 
-                    let order_book_msg = &orderbook[0];
-                    let order_book_msg_u8 = 
-                        encode_orderbook(&order_book_msg).unwrap();
-
-                    // encode
-                    nanomsg_writer.write(&order_book_msg_u8).unwrap();
+                    for orderbook in orderbook_msg {
+                        let symbol = orderbook.symbol.to_owned();
+                        let byte_data = encode_orderbook(&orderbook).unwrap();
+                        data_vec.push((symbol, byte_data));
+                    }
                 }
                 MessageType::L2TopK => {
                     let received_at = msg.received_at as i64;
-                    let orderbook = tokio::task::spawn_blocking(move || {
+                    let orderbook_msg = tokio::task::spawn_blocking(move || {
                         parse_l2_topk(exchange, MarketType::Spot, &msg_r.json, Some(received_at))
                             .unwrap()
                     })
                     .await
                     .unwrap();
 
-                    let key = format!(
-                        "{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, orderbook[0].symbol
-                    );
-                    let nanomsg_writer = if writers.contains_key(&key) {
-                        writers.get_mut(&key).unwrap()
-                    } else {
-                        let socket = create(&key);
-                        writers.insert(key.to_owned(), socket);
-                        writers.get_mut(&key).unwrap()
-                    };
-
-                    let orderbook = &orderbook[0];
-
-                    // encode
-                    let order_book_bytes = encode_orderbook(orderbook).unwrap();
-
-                    nanomsg_writer.write(&order_book_bytes).unwrap();
+                    for orderbook in orderbook_msg {
+                        let symbol = orderbook.symbol.to_owned();
+                        let byte_data = encode_orderbook(&orderbook).unwrap();
+                        data_vec.push((symbol, byte_data));
+                    }
                 }
                 MessageType::Candlestick => {
                     let kline_msg = tokio::task::spawn_blocking(move || {
@@ -188,25 +142,29 @@ async fn create_nanomsg_writer_thread(
                     .await
                     .unwrap();
 
-                    let key = format!(
-                        "{}_{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, kline_msg.symbol, period
-                    );
-                    let nanomsg_writer = if writers.contains_key(&key) {
-                        writers.get_mut(&key).unwrap()
-                    } else {
-                        let socket = create(&key);
-                        writers.insert(key.to_owned(), socket);
-                        writers.get_mut(&key).unwrap()
-                    };
-
-                    // encode
-                    let kline_msg_bytes = encode_kline(&kline_msg).unwrap();
-
-                    nanomsg_writer.write(&kline_msg_bytes).unwrap();
+                    let symbol = kline_msg.symbol.to_owned();
+                    let byte_data = encode_kline(&kline_msg).unwrap();
+                    data_vec.push((symbol, byte_data));
                 }
                 _ => panic!("Not implemented"),
             };
+
+            // Send a message to the corresponding message queue
+            for (symbol, data_byte) in data_vec {
+                let key = format!(
+                    "{}_{}_{}_{}_{}",
+                    msg.exchange, msg.market_type, msg.msg_type, symbol, period
+                );
+                let writer_mq = if writers.contains_key(&key) {
+                    writers.get_mut(&key).unwrap()
+                } else {
+                    let socket = create(&key).await;
+                    writers.insert(key.to_owned(), socket);
+                    writers.get_mut(&key).unwrap()
+                };
+                writer_mq.write(&data_byte).await.unwrap();
+            }
+
             // copy to redis
             if let Some(ref tx_redis) = tx_redis {
                 tx_redis.send(msg).unwrap();
@@ -229,7 +187,7 @@ pub fn create_writer_threads(
     let mut threads = Vec::new();
 
     threads.push(
-        create_nanomsg_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed(),
+        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed(),
     );
 
     threads

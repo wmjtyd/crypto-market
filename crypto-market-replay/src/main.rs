@@ -9,9 +9,9 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use crypto_crawler::{MarketType, Message, MessageType};
+use crypto_crawler::{MarketType, Message};
 
-use chrono::{DateTime, Duration, Local, TimeZone, Timelike, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use crypto_msg_parser::parse_l2_topk;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ async fn ws_handler(
 async fn handle_socket(
     mut socket: WebSocket,
     state: Arc<AppState>,
-    application_config: ApplicationConfig,
+    _application_config: ApplicationConfig,
 ) {
     loop {
         if let Some(msg) = socket.recv().await {
@@ -157,7 +157,7 @@ pub fn filename(params: &Params) -> Vec<String> {
 
     let mut datetime = format!("{}", begin_datetime.format("%Y%m%d"));
     //循环
-    for i in 0..days {
+    for _i in 0..days {
         let ipc = if let Some(period) = &params.period {
             format!(
                 "{}_{}_{}_{}_{}",
@@ -198,7 +198,7 @@ pub struct AppState {
 pub async fn processing_requests(str: &str, state: &AppState) -> String {
     let params: Action = serde_json::from_str(str).unwrap();
     if let Some(echo) = params.echo {
-        let mut result = String::new();
+        let result = String::new();
         let receiver = state.receiver.clone();
         tokio::task::spawn_blocking(move || {
             let locked = receiver.lock().unwrap();
@@ -224,7 +224,7 @@ pub async fn processing_requests(str: &str, state: &AppState) -> String {
     } else {
         if params.action == "subscribe" {
             let mut receiver = state.receiver.lock().unwrap();
-            let (tx, rx) = std::sync::mpsc::channel();
+            let (_tx, rx) = std::sync::mpsc::channel();
             let mut rng = rand::thread_rng();
             let y = rng.gen::<i64>();
             receiver.insert(y, rx);

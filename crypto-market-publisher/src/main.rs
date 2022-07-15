@@ -85,7 +85,7 @@ fn start_client(m: &ArgMatches) {
         format!("{}_{}_{}", exchange, market_type, msg_type)
     };
 
-    let subscribe_list = vec![ipc.as_str()];
+    let _subscribe_list = vec![ipc.as_str()];
 
     // *CAUTION*: this should not be set to `false` in production!!!
     config.verify_peer(false);

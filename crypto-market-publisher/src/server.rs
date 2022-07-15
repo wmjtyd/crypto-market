@@ -1,16 +1,16 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     net::{self, SocketAddr},
     sync::{Arc, Mutex},
     thread,
 };
 
 use mio::{net::UdpSocket};
-use mio::Poll;
-use nanomsg::{Protocol, Socket};
 use quiche::Config;
 use ring::rand::SystemRandom;
+use wmjtyd_libstock::message::zeromq::Zeromq;
+use tokio::io::AsyncReadExt;
+use wmjtyd_libstock::message::zeromq::Sub;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
@@ -341,17 +341,16 @@ fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
         let network_socket = socket.clone();
 
         debug!("{}", url);
-        thread::spawn(move || {
-            let mut socket = wmjtyd_libstock::message::nanomsg::Nanomsg::new_subscribe(url.as_str()).unwrap();
-            socket.subscribe(b"").unwrap();
+        tokio::task::spawn(async move {
+            let mut socket = Zeromq::<Sub>::new(&url).await.unwrap();
+            socket.subscribe("").await.unwrap();
 
-            let mut buf: Vec<u8> = Vec::new();
+            let mut buf = [0_u8;8192];
             loop {
-                match socket.read_to_end(&mut buf) {
+                match socket.read(&mut buf).await{
                     Ok(buf_size) => {
                         debug!("sub data len: {}", buf.len());
                         distribute(network_socket.clone(), topic.to_string(), &buf[..buf_size]);
-                        buf.clear();
                     }
                     Err(err) => {
                         debug!("Client failed to receive msg '{}'.", err);

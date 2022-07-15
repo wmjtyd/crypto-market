@@ -1,13 +1,15 @@
 // pub(super) mod file_writer;
 
 use concat_string::concat_string;
-use nanomsg::{Protocol, Socket};
-use std::io::Read;
 use tracing::error;
 use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
 
 // pub use file_writer::FileWriter;
 pub use wmjtyd_libstock::file::writer::DataWriter;
+
+use wmjtyd_libstock::message::zeromq::Zeromq;
+use tokio::io::AsyncReadExt;
+use wmjtyd_libstock::message::zeromq::Sub;
 
 pub trait Writer {
     fn write(&mut self, s: &str);
@@ -26,19 +28,18 @@ pub async fn create_write_file_thread(
     let task = async move {
         let mut data_writer = DataWriter::new();
         data_writer.start().await?;
-    
-        let mut socket = wmjtyd_libstock::message::nanomsg::Nanomsg::new_subscribe(&ipc_exchange_market_type_msg_type.as_str()).unwrap();
-        socket.subscribe(b"").unwrap();
+        let mut socket = Zeromq::<Sub>::new(&ipc_exchange_market_type_msg_type).await.unwrap();
+        socket.subscribe("").await.unwrap();
 
-        tokio::task::spawn_blocking(move || loop {
+        let mut buf = [0u8; 8192];
+        tokio::task::spawn( async move { loop {
             // 数据 payload
-            let mut payload = Vec::<u8>::new();
-            let read_result = socket.read_to_end(&mut payload);
-            match read_result {
-                Ok(_) => {
+            let size = socket.read(&mut buf).await;
+            match size {
+                Ok(size) => {
                     let result = data_writer.add(DataEntry {
                         filename: ipc.to_string(),
-                        data: payload,
+                        data: buf[..size].to_vec(),
                     });
 
                     if let Err(e) = result {
@@ -51,7 +52,7 @@ pub async fn create_write_file_thread(
                     break;
                 }
             }
-        }).await?;
+        }}).await?;
 
 
         Ok::<(), RecorderWriterError>(())

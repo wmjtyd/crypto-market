@@ -6,14 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crypto-crawler = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-markets = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-market-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-msg-parser = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-msg-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-pair = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-rest-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-crypto-ws-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 redis = "0.21.5"
 reopen = { version = "1.0.3", features = ["signals"] }
 serde_json = "1.0.81"
@@ -32,10 +24,16 @@ rust_decimal = "1.23.1"
 rust_decimal_macros = "1.23.1"
 phf = { version = "0.10.1", features = ["macros"] }
 futures = "0.3.21"
-wmjtyd-libstock = { git = "https://github.com/wmjtyd/libstock", branch="staging-0.3.0b2" }
 tracing = "0.1.35"
 concat-string = "1.0.1"
 thiserror = "1.0.31"
+
+[dependencies.wmjtyd-libstock]
+git = "https://github.com/wmjtyd/libstock.git"
+default-features = false
+features = ["crypto", "zeromq", "slack"]
+branch = "staging-0.3.0b3"
+
 
 [dev-dependencies]
 tracing-subscriber = "0.3.14"

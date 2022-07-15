@@ -3,10 +3,8 @@ use crypto_crawler::*;
 use crypto_market_integration::{crawl_other, create_writer_threads};
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
-use futures::Future;
 use log::*;
-use redis::IntoConnectionInfo;
-use std::{env, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 pub async fn crawl(
     exchange: &'static str,

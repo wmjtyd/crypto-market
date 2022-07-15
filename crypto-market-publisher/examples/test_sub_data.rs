@@ -1,31 +1,17 @@
-use std::{io::Write, thread, time::Duration};
+use std::{thread, time::Duration};
+use wmjtyd_libstock::message::zeromq::Zeromq;
+use tokio::io::AsyncWriteExt;
+use wmjtyd_libstock::message::zeromq::Pub;
 
-use nanomsg::{Protocol, Socket};
 
-fn main() {
-    let mut socket = Socket::new(Protocol::Pub).unwrap();
-    let mut endpoint = socket.bind("ipc:///tmp/test_test_test_test.ipc").unwrap();
-    let mut count = 1u32;
-    let topic = b"";
-
-    println!("Server is ready.");
-
-    let mut msg = Vec::with_capacity(topic.len() + 16);
+#[tokio::main]
+async fn main() {
+    const PATH: &str = "ipc:///tmp/test_test_test_test.ipc";
+    let mut pub_ = Zeromq::<Pub>::new(PATH).await.unwrap();
+    let mut package_num = 0;
     loop {
-        let postfix = format!(" #{}", count);
-        msg.clear();
-        msg.extend_from_slice(topic);
-        msg.extend_from_slice(postfix.as_bytes());
-        match socket.write_all(&msg) {
-            Ok(..) => println!("Published '{:?}'.", msg),
-            Err(err) => {
-                println!("Server failed to publish '{}'.", err);
-                break;
-            }
-        }
+        pub_.write(format!("{package_num}").as_bytes()).await.unwrap();
         thread::sleep(Duration::from_millis(400));
-        count += 1;
+        package_num += 1;
     }
-
-    endpoint.shutdown().unwrap();
 }
