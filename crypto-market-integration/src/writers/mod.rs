@@ -53,12 +53,12 @@ async fn create_writer_thread(
 ) {
     tokio::task::spawn(async move {
         let mut writers= HashMap::new();
-        let mut data_vec = Vec::new();
 
         for msg in rx {
             debug!("msg ->> yes");
             let msg = Arc::new(msg);
             let msg_r = msg.clone();
+            let mut data_vec = Vec::new();
 
             // Convert the message to &[u8]
             match msg_type {
@@ -101,18 +101,6 @@ async fn create_writer_thread(
                     })
                     .await
                     .unwrap();
-
-                    let key = format!(
-                        "{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, orderbook_msg[0].symbol
-                    );
-                    let writer_mq = if writers.contains_key(&key) {
-                        writers.get_mut(&key).unwrap()
-                    } else {
-                        let socket = create(&key).await;
-                        writers.insert(key.to_owned(), socket);
-                        writers.get_mut(&key).unwrap()
-                    };
 
                     for orderbook in orderbook_msg {
                         let symbol = orderbook.symbol.to_owned();
