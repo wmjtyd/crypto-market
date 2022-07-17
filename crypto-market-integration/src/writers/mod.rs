@@ -35,10 +35,9 @@ async fn create(name: &String) -> impl tokio::io::AsyncWriteExt  {
     let ipc_exchange_market_type_msg_type =
         format!("ipc:///tmp/{}.ipc", file_name);
     
-    let socket = if let Ok(v) = Zeromq::<Pub>::new(&ipc_exchange_market_type_msg_type).await {
-        v
-    } else {
-        panic!("init publish error: {}", ipc_exchange_market_type_msg_type);
+    let socket = match Zeromq::<Pub>::new(&ipc_exchange_market_type_msg_type).await {
+        Ok(v) =>  v,
+        Err(msg) => panic!("init publish error: {}; msg: {:?}", ipc_exchange_market_type_msg_type, msg)
     };
     socket
 }
@@ -139,10 +138,17 @@ async fn create_writer_thread(
 
             // Send a message to the corresponding message queue
             for (symbol, data_byte) in data_vec {
-                let key = format!(
-                    "{}_{}_{}_{}_{}",
-                    msg.exchange, msg.market_type, msg.msg_type, symbol, period
-                );
+                let key = if period.len() != 0 {
+                    format!(
+                        "{}_{}_{}_{}_{}",
+                        msg.exchange, msg.market_type, msg.msg_type, symbol, period
+                    )
+                } else {
+                    format!(
+                        "{}_{}_{}_{}",
+                        msg.exchange, msg.market_type, msg.msg_type, symbol
+                    )
+                };
                 let writer_mq = if writers.contains_key(&key) {
                     writers.get_mut(&key).unwrap()
                 } else {
