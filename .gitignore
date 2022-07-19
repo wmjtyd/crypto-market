@@ -1,3 +1,6 @@
 target/
 .DS_Store
 *.csv
+Cargo.lock
+.vscode/
+start*.sh

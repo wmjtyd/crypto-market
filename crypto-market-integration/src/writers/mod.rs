@@ -1,5 +1,5 @@
 use crypto_crawler::*;
-use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade};
+use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade, parse_funding_rate};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
 use tokio::io::AsyncWriteExt;
@@ -20,6 +20,7 @@ use wmjtyd_libstock::data::{
     kline::encode_kline,
     orderbook::encode_orderbook,
     trade::encode_trade,
+    funding_rate::encode_funding_rate,
 };
 
 pub trait Writer {
@@ -133,6 +134,24 @@ async fn create_writer_thread(
                     let byte_data = encode_kline(&kline_msg).unwrap();
                     data_vec.push((symbol, byte_data));
                 }
+                MessageType::FundingRate => {
+                    let funding_rate_msg = tokio::task::spawn_blocking(move || {
+                        println!("{}", msg_r.json);
+                        parse_funding_rate(exchange, market_type, &msg_r.json, Some(1232))
+                    }).await.unwrap().unwrap();
+
+                    for mut funding_rate in funding_rate_msg {
+
+                        if  None == funding_rate.estimated_rate  {
+                            funding_rate.estimated_rate = Some(0.0);
+                        }
+
+                        let symbol = funding_rate.symbol.to_owned();
+                        let byte_data = encode_funding_rate(&funding_rate).unwrap();
+                        data_vec.push((symbol, byte_data));
+                    }
+
+                }
                 _ => panic!("Not implemented"),
             };
 
@@ -149,9 +168,11 @@ async fn create_writer_thread(
                         msg.exchange, msg.market_type, msg.msg_type, symbol
                     )
                 };
+                debug!("{}", key);
                 let writer_mq = if writers.contains_key(&key) {
                     writers.get_mut(&key).unwrap()
                 } else {
+                    println!("{key}");
                     let socket = create(&key).await;
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
