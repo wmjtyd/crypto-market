@@ -69,7 +69,7 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
         server_alive_check();
     }));
 
-    let socket_clone = socket.clone();
+    let socket_clone = socket;
     // 发送
     service.push(thread::spawn(|| {
         server_send(ipcs, socket_clone);
@@ -77,7 +77,6 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
 
     for s in service {
         s.join().unwrap();
-        break;
     }
 }
 
@@ -315,7 +314,7 @@ fn server_alive_check() {
                     c.conn.stats()
                 );
                 for cids in client_sub_lock.values_mut() {
-                    cids.remove(&cid);
+                    cids.remove(cid);
                 }
             }
 
@@ -375,11 +374,11 @@ fn distribute(socket: Arc<UdpSocket>, key: String, data: &[u8]) {
     let mut out = [0u8; 1024];
     
     for cid in sub {
-        let client = clients.get_mut(&cid).unwrap();
+        let client = clients.get_mut(cid).unwrap();
 
         if client.conn.is_established() {
             for stream_id in client.conn.writable() {
-                if let Err(e) = client.conn.stream_send(stream_id, &data, false) {
+                if let Err(e) = client.conn.stream_send(stream_id, data, false) {
                     println!("error: {:?}", e);
                 };
             }
@@ -511,8 +510,8 @@ fn handle_sub(
     // sub@xxx_xxx
     //  or
     // sub@xxx_xx;sub@xxx_xxx
-    for action  in actions.split(";").into_iter() {
-        let command: Vec<&str> = action.split("@").collect();
+    for action  in actions.split(';') {
+        let command: Vec<&str> = action.split('@').collect();
         if command.len() != 2 {
             break;
             }

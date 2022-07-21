@@ -30,8 +30,8 @@ pub trait Writer {
 
 
 // Quickly create a message queue
-async fn create(name: &String) -> impl tokio::io::AsyncWriteExt  {
-    let file_name = name.replacen("/", "-", 3);
+async fn create(name: &str) -> impl tokio::io::AsyncWriteExt  {
+    let file_name = name.replacen('/', "-", 3);
 
     let ipc_exchange_market_type_msg_type =
         format!("ipc:///tmp/{}.ipc", file_name);
@@ -177,7 +177,7 @@ async fn create_writer_thread(
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
                 };
-                writer_mq.write(&data_byte).await.unwrap();
+                writer_mq.write_all(&data_byte).await.unwrap();
             }
 
             // copy to redis
@@ -199,11 +199,7 @@ pub fn create_writer_threads(
     msg_type: MessageType,
     period: Arc<String>,
 ) -> Vec<BoxFuture<'static, ()>> {
-    let mut threads = Vec::new();
-
-    threads.push(
-        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed(),
-    );
-
-    threads
+    vec![
+        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed()
+    ]
 }
