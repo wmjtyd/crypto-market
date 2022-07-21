@@ -1,5 +1,7 @@
 use crypto_crawler::*;
-use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade, parse_funding_rate};
+use crypto_msg_parser::{
+    parse_bbo, parse_candlestick, parse_funding_rate, parse_l2, parse_l2_topk, parse_trade,
+};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
 use tokio::io::AsyncWriteExt;
@@ -11,16 +13,12 @@ use std::{
     sync::{
         mpsc::{Receiver, Sender},
         Arc,
-    }
+    },
 };
 
-
 use wmjtyd_libstock::data::{
-    bbo::encode_bbo,
-    kline::encode_kline,
-    orderbook::encode_orderbook,
-    trade::encode_trade,
-    funding_rate::encode_funding_rate,
+    bbo::encode_bbo, funding_rate::encode_funding_rate, kline::encode_kline,
+    orderbook::encode_orderbook, trade::encode_trade,
 };
 
 pub trait Writer {
@@ -28,17 +26,18 @@ pub trait Writer {
     fn close(&mut self);
 }
 
-
 // Quickly create a message queue
-async fn create(name: &str) -> impl tokio::io::AsyncWriteExt  {
+async fn create(name: &str) -> impl tokio::io::AsyncWriteExt {
     let file_name = name.replacen('/', "-", 3);
 
-    let ipc_exchange_market_type_msg_type =
-        format!("ipc:///tmp/{}.ipc", file_name);
-    
+    let ipc_exchange_market_type_msg_type = format!("ipc:///tmp/{}.ipc", file_name);
+
     let socket = match Zeromq::<Pub>::new(&ipc_exchange_market_type_msg_type).await {
-        Ok(v) =>  v,
-        Err(msg) => panic!("init publish error: {}; msg: {:?}", ipc_exchange_market_type_msg_type, msg)
+        Ok(v) => v,
+        Err(msg) => panic!(
+            "init publish error: {}; msg: {:?}",
+            ipc_exchange_market_type_msg_type, msg
+        ),
     };
     socket
 }
@@ -52,7 +51,7 @@ async fn create_writer_thread(
     period: Arc<String>,
 ) {
     tokio::task::spawn(async move {
-        let mut writers= HashMap::new();
+        let mut writers = HashMap::new();
 
         for msg in rx {
             debug!("msg ->> yes");
@@ -76,7 +75,6 @@ async fn create_writer_thread(
                     .await
                     .unwrap();
 
-
                     let symbol = bbo_msg.symbol.to_owned();
                     let byte_data = encode_bbo(&bbo_msg).unwrap();
                     data_vec.push((symbol, byte_data));
@@ -87,7 +85,6 @@ async fn create_writer_thread(
                     })
                     .await
                     .unwrap();
-
 
                     for trdate in trade_msg {
                         let symbol = trdate.symbol.to_owned();
@@ -138,11 +135,13 @@ async fn create_writer_thread(
                     let funding_rate_msg = tokio::task::spawn_blocking(move || {
                         println!("{}", msg_r.json);
                         parse_funding_rate(exchange, market_type, &msg_r.json, Some(1232))
-                    }).await.unwrap().unwrap();
+                    })
+                    .await
+                    .unwrap()
+                    .unwrap();
 
                     for mut funding_rate in funding_rate_msg {
-
-                        if  None == funding_rate.estimated_rate  {
+                        if None == funding_rate.estimated_rate {
                             funding_rate.estimated_rate = Some(0.0);
                         }
 
@@ -150,7 +149,6 @@ async fn create_writer_thread(
                         let byte_data = encode_funding_rate(&funding_rate).unwrap();
                         data_vec.push((symbol, byte_data));
                     }
-
                 }
                 _ => panic!("Not implemented"),
             };
@@ -199,7 +197,5 @@ pub fn create_writer_threads(
     msg_type: MessageType,
     period: Arc<String>,
 ) -> Vec<BoxFuture<'static, ()>> {
-    vec![
-        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed()
-    ]
+    vec![create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed()]
 }

@@ -2,13 +2,11 @@
 mod client;
 mod server;
 
-
 use std::net::SocketAddr;
 
 use clap::{clap_app, ArgMatches};
 
 use server::create_server;
-
 
 #[macro_use]
 extern crate lazy_static;
@@ -103,7 +101,6 @@ fn start_client(m: &ArgMatches) {
     config.set_initial_max_streams_bidi(100);
     config.set_initial_max_streams_uni(100);
     config.set_disable_active_migration(true);
-
 
     let rx = client::create_client(addr, config, ipc);
     for i in rx.iter() {
