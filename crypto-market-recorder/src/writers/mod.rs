@@ -7,9 +7,9 @@ use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
 // pub use file_writer::FileWriter;
 pub use wmjtyd_libstock::file::writer::DataWriter;
 
-use wmjtyd_libstock::message::zeromq::Zeromq;
 use tokio::io::AsyncReadExt;
 use wmjtyd_libstock::message::zeromq::Sub;
+use wmjtyd_libstock::message::zeromq::Zeromq;
 
 pub trait Writer {
     fn write(&mut self, s: &str);
@@ -28,32 +28,36 @@ pub async fn create_write_file_thread(
     let task = async move {
         let mut data_writer = DataWriter::new();
         data_writer.start().await?;
-        let mut socket = Zeromq::<Sub>::new(&ipc_exchange_market_type_msg_type).await.unwrap();
+        let mut socket = Zeromq::<Sub>::new(&ipc_exchange_market_type_msg_type)
+            .await
+            .unwrap();
         socket.subscribe("").await.unwrap();
 
         let mut buf = [0u8; 8192];
-        tokio::task::spawn( async move { loop {
-            // 数据 payload
-            let size = socket.read(&mut buf).await;
-            match size {
-                Ok(size) => {
-                    let result = data_writer.add(DataEntry {
-                        filename: ipc.to_string(),
-                        data: buf[..size].to_vec(),
-                    });
+        tokio::task::spawn(async move {
+            loop {
+                // 数据 payload
+                let size = socket.read(&mut buf).await;
+                match size {
+                    Ok(size) => {
+                        let result = data_writer.add(DataEntry {
+                            filename: ipc.to_string(),
+                            data: buf[..size].to_vec(),
+                        });
 
-                    if let Err(e) = result {
-                        error!("Failed to add data: {e}");
+                        if let Err(e) = result {
+                            error!("Failed to add data: {e}");
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        error!("Client failed to receive payload: {err}");
                         break;
                     }
                 }
-                Err(err) => {
-                    error!("Client failed to receive payload: {err}");
-                    break;
-                }
             }
-        }}).await?;
-
+        })
+        .await?;
 
         Ok::<(), RecorderWriterError>(())
     };

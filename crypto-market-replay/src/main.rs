@@ -203,21 +203,18 @@ pub async fn processing_requests(str: &str, state: &AppState) -> String {
         tokio::task::spawn_blocking(move || {
             let locked = receiver.lock().unwrap();
             let receiver = locked.get(&echo).unwrap();
-            for msg in receiver {
-                let msg: Message = msg;
-                let received_at = msg.received_at as i64;
+            let msg = receiver.iter().next().unwrap();
+            let received_at = msg.received_at as i64;
 
-                let orderbook = parse_l2_topk(
-                    params.params["symbol"].as_str().unwrap(),
-                    MarketType::Spot,
-                    &(msg as Message).json,
-                    Some(received_at),
-                )
-                .unwrap();
-                let orderbook = &orderbook[0];
-                result.clone().push_str(&json!(orderbook).to_string());
-                break;
-            }
+            let orderbook = parse_l2_topk(
+                params.params["symbol"].as_str().unwrap(),
+                MarketType::Spot,
+                &(msg as Message).json,
+                Some(received_at),
+            )
+            .unwrap();
+            let orderbook = &orderbook[0];
+            result.clone().push_str(&json!(orderbook).to_string());
         })
         .await
         .unwrap();
@@ -238,5 +235,5 @@ pub async fn processing_requests(str: &str, state: &AppState) -> String {
         }
     }
 
-    return "".to_string();
+    String::new()
 }
