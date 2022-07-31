@@ -26,4 +26,3 @@ rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
 git = "https://github.com/wmjtyd/libstock.git"
 default-features = false
 features = ["crypto", "zeromq", "slack"]
-branch = "staging-0.3.0b3"

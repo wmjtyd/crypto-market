@@ -32,7 +32,6 @@ thiserror = "1.0.31"
 git = "https://github.com/wmjtyd/libstock.git"
 default-features = false
 features = ["crypto", "zeromq", "slack"]
-branch = "staging-0.3.0b3"
 
 
 [dev-dependencies]
