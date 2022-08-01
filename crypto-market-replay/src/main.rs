@@ -5,7 +5,7 @@ use axum::{
         Extension, TypedHeader,
     },
     http::{header, StatusCode},
-    response::{Headers, IntoResponse},
+    response::{Response, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
@@ -23,6 +23,7 @@ use std::{
     sync::{mpsc::Receiver, Arc},
 };
 use std::{ops::Add, sync::Mutex};
+use axum::http::HeaderValue;
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use websocket::{config::config::ApplicationConfig, init_config};
@@ -137,11 +138,14 @@ pub async fn handler(
     };
     let stream = ReaderStream::new(file);
     let body = StreamBody::new(stream);
-    let headers = Headers([
-        (header::CONTENT_TYPE, "text/toml; charset=utf-8"),
-        (header::CONTENT_DISPOSITION, "attachment; filename=\"data\""),
-    ]);
-
+    // let headers = Response::Headers([
+    //     (header::CONTENT_TYPE, "text/toml; charset=utf-8"),
+    //     (header::CONTENT_DISPOSITION, "attachment; filename=\"data\""),
+    // ]);
+    // let header= Response::headers();
+    let mut headers: Response<()> = Response::default();
+    headers.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/toml; charset=utf-8"));
+    headers.headers_mut().insert(header::CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=\"data\""));
     Ok((headers, body))
 }
 
