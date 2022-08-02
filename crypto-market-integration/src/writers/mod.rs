@@ -15,12 +15,14 @@ use std::{
 };
 
 
+use wmjtyd_libstock::data::serializer::StructSerializer;
+
 use wmjtyd_libstock::data::{
-    bbo::encode_bbo,
-    kline::encode_kline,
-    orderbook::encode_orderbook,
-    trade::encode_trade,
-    funding_rate::encode_funding_rate,
+    bbo::BboStructure,
+    kline::KlineStructure,
+    orderbook::OrderbookStructure,
+    trade::TradeStructure,
+    funding_rate::FundingRateStructure,
 };
 
 pub trait Writer {
@@ -76,10 +78,16 @@ async fn create_writer_thread(
                     .await
                     .unwrap();
 
-
                     let symbol = bbo_msg.symbol.to_owned();
-                    let byte_data = encode_bbo(&bbo_msg).unwrap();
-                    data_vec.push((symbol, byte_data));
+
+                    if let Ok(bbo_structure) = BboStructure::try_from(&bbo_msg) {
+                        let mut byte_data = Vec::new();
+                        if bbo_structure.serialize(&mut byte_data).is_err() {
+                            continue;
+                        }
+                        data_vec.push((symbol, byte_data));
+                    };
+                    
                 }
                 MessageType::Trade => {
                     let trade_msg = tokio::task::spawn_blocking(move || {
@@ -91,8 +99,15 @@ async fn create_writer_thread(
 
                     for trdate in trade_msg {
                         let symbol = trdate.symbol.to_owned();
-                        let byte_data = encode_trade(&trdate).unwrap();
-                        data_vec.push((symbol, byte_data));
+
+                        if let Ok(trade_structure) = TradeStructure::try_from(&trdate) {
+                            let mut byte_data = Vec::new();
+                            if trade_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
                 }
                 MessageType::L2Event => {
@@ -104,8 +119,14 @@ async fn create_writer_thread(
 
                     for orderbook in orderbook_msg {
                         let symbol = orderbook.symbol.to_owned();
-                        let byte_data = encode_orderbook(&orderbook).unwrap();
-                        data_vec.push((symbol, byte_data));
+
+                        if let Ok(order_book_structure) = OrderbookStructure::try_from(&orderbook) {
+                            let mut byte_data = Vec::new();
+                            if order_book_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
                 }
                 MessageType::L2TopK => {
@@ -119,8 +140,14 @@ async fn create_writer_thread(
 
                     for orderbook in orderbook_msg {
                         let symbol = orderbook.symbol.to_owned();
-                        let byte_data = encode_orderbook(&orderbook).unwrap();
-                        data_vec.push((symbol, byte_data));
+
+                        if let Ok(order_book_structure) = OrderbookStructure::try_from(&orderbook) {
+                            let mut byte_data = Vec::new();
+                            if order_book_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
                 }
                 MessageType::Candlestick => {
@@ -131,8 +158,14 @@ async fn create_writer_thread(
                     .unwrap();
 
                     let symbol = kline_msg.symbol.to_owned();
-                    let byte_data = encode_kline(&kline_msg).unwrap();
-                    data_vec.push((symbol, byte_data));
+
+                    if let Ok(kline_structure) = KlineStructure::try_from(&kline_msg) {
+                        let mut byte_data = Vec::new();
+                        if kline_structure.serialize(&mut byte_data).is_err() {
+                            continue;
+                        }
+                        data_vec.push((symbol, byte_data));
+                    };
                 }
                 MessageType::FundingRate => {
                     let funding_rate_msg = tokio::task::spawn_blocking(move || {
@@ -147,8 +180,13 @@ async fn create_writer_thread(
                         }
 
                         let symbol = funding_rate.symbol.to_owned();
-                        let byte_data = encode_funding_rate(&funding_rate).unwrap();
-                        data_vec.push((symbol, byte_data));
+                        if let Ok(funding_rate_structure) = FundingRateStructure::try_from(&funding_rate) {
+                            let mut byte_data = Vec::new();
+                            if funding_rate_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
 
                 }
