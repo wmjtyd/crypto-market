@@ -10,7 +10,7 @@ pub use wmjtyd_libstock::file::writer::DataWriter;
 
 
 use wmjtyd_libstock::message::zeromq::ZeromqSubscriber;
-use wmjtyd_libstock::message::traits::{Subscribe, Connect};
+use wmjtyd_libstock::message::traits::{Subscribe, Connect, StreamExt};
 
 
 pub trait Writer {
@@ -41,17 +41,17 @@ pub async fn create_write_file_thread(
 
         tokio::task::spawn( async move { loop {
             // 数据 payload
-            println!("start");
-            let message = subscriber.next();
+            tracing::debug!("start");
+            let message = StreamExt::next(&mut subscriber).await;
             if message.is_none() {
                 break;
             }
 
-            println!("yes");
+            tracing::debug!("yes");
 
             match message.unwrap() {
                 Ok(message) => {
-                    println!("{:?}", message);
+                    tracing::debug!("{:?}", message);
                     let result = data_writer.add(DataEntry {
                         filename: ipc.to_string(),
                         data: message,
