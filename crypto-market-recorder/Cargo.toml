@@ -16,7 +16,6 @@ tokio = { version = "1.18.2", features = ["rt", "rt-multi-thread", "macros"] }
 lazy_static = "1.4.0"
 slack-hook = "0.8.0"
 openssl = { version = "0.10", features = ["vendored"] }
-nanomsg = "0.7.2"
 chrono = "0.4.19"
 clap = "~2.27.0"
 
