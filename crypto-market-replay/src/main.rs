@@ -109,9 +109,10 @@ pub async fn handler(
     Json(params): Json<Params>,
     Extension(application_config): Extension<ApplicationConfig>,
 ) -> impl IntoResponse {
+    println!("1111");
     //Todo: 从配置文件读取配置
-    let src = application_config.record_dir + "/" + &filename(&params)[0];
-
+    let src = application_config.record_dir + &filename(&params) + ".csv";
+    println!("{}", src);
     // let  mut stream = ReaderStream::new(File::open("./data.csv").await.unwrap());
 
     // //Todo: 同时返回多个文件
@@ -149,33 +150,46 @@ pub async fn handler(
     Ok((headers, body))
 }
 
-pub fn filename(params: &Params) -> Vec<String> {
-    let mut files = Vec::new();
+pub fn filename(params: &Params) -> String{
+    // let mut files = Vec::new();
     let exchange = &params.exchange;
     let market_type = &params.market_type;
     let msg_type = &params.msg_type;
     let symbol = &params.symbols;
-    let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
-    let end_datetime = Utc.timestamp(params.end_datetime, 0);
-    let days = (end_datetime - begin_datetime).num_days();
-
-    let mut datetime = format!("{}", begin_datetime.format("%Y%m%d"));
+    let date = &params.date;
+    // date+ "/" + exchange+market_type+msg_type+symbol
+    // format!("{}/{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol);
+    // let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
+    // let end_datetime = Utc.timestamp(params.end_datetime, 0);
+    // let days = (end_datetime - begin_datetime).num_days();
+    let fileName = if let Some(period) = &params.period {
+        if period.is_empty() {
+            format!("/{}/{}_{}_{}_{}",date,exchange, market_type, msg_type, symbol)
+        }else {
+            format!("/{}/{}_{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol,period)
+        }
+        // format!("/{}/{}_{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol,period)
+    } else {
+        format!("/{}/{}_{}_{}_{}",date,exchange, market_type, msg_type, symbol)
+    };
+    fileName
+    // let mut datetime = format!("{}", begin_datetime.format("%Y%m%d"));
     //循环
-    for _i in 0..days {
-        let ipc = if let Some(period) = &params.period {
-            format!(
-                "{}_{}_{}_{}_{}",
-                exchange, market_type, msg_type, symbol, period
-            )
-        } else {
-            format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
-        };
-        let filename = format!("{}/{}", datetime, ipc);
-        files.push(filename);
-        begin_datetime = begin_datetime.add(Duration::days(1));
-        datetime = format!("{}", begin_datetime.format("%Y%m%d"));
-    }
-    files
+    // for _i in 0..days {
+    //     let ipc = if let Some(period) = &params.period {
+    //         format!(
+    //             "{}_{}_{}_{}_{}",
+    //             exchange, market_type, msg_type, symbol, period
+    //         )
+    //     } else {
+    //         format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
+    //     };
+    //     let filename = format!("{}/{}", datetime, ipc);
+    //     files.push(filename);
+    //     begin_datetime = begin_datetime.add(Duration::days(1));
+    //     datetime = format!("{}", begin_datetime.format("%Y%m%d"));
+    // }
+    // files
 }
 
 #[derive(Deserialize)]
@@ -185,8 +199,9 @@ pub struct Params {
     pub msg_type: String,
     pub symbols: String,
     pub period: Option<String>,
-    pub begin_datetime: i64,
-    pub end_datetime: i64,
+    // pub begin_datetime: i64,
+    // pub end_datetime: i64,
+    pub date:String,
 }
 #[derive(Serialize, Deserialize)]
 pub struct Action {
