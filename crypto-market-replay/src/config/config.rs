@@ -15,7 +15,7 @@ pub struct ApplicationConfig {
 
 impl ApplicationConfig {
     pub fn new(toml_data: &str) -> Self {
-        let mut config = match toml::from_str(toml_data) {
+        let config = match toml::from_str(toml_data) {
             Ok(e) => e,
             Err(e) => panic!("{}", e),
         };

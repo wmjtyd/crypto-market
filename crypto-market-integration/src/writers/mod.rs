@@ -2,10 +2,13 @@ use crypto_crawler::*;
 use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade, parse_funding_rate};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
-use tokio::io::AsyncWriteExt;
-use wmjtyd_libstock::message::zeromq::Pub;
-use wmjtyd_libstock::message::zeromq::Zeromq;
 
+use wmjtyd_libstock::message::{zeromq::ZeromqPublisher, traits::Bind};
+use wmjtyd_libstock::message::traits::SyncPublisher;
+
+
+
+use std::io::Write;
 use std::{
     collections::HashMap,
     sync::{
@@ -32,17 +35,22 @@ pub trait Writer {
 
 
 // Quickly create a message queue
-async fn create(name: &String) -> impl tokio::io::AsyncWriteExt  {
+async fn create(name: &String) -> impl SyncPublisher  {
     let file_name = name.replacen("/", "-", 3);
 
     let ipc_exchange_market_type_msg_type =
         format!("ipc:///tmp/{}.ipc", file_name);
     
-    let socket = match Zeromq::<Pub>::new(&ipc_exchange_market_type_msg_type).await {
-        Ok(v) =>  v,
-        Err(msg) => panic!("init publish error: {}; msg: {:?}", ipc_exchange_market_type_msg_type, msg)
+    let publisher = if let Ok(mut publisher) = ZeromqPublisher::new() {
+        if publisher.bind(&ipc_exchange_market_type_msg_type).is_err() {
+            // 以后需要处理一下
+            panic!("ipc bind error {}", ipc_exchange_market_type_msg_type);
+        }
+        publisher
+    } else {
+        panic!("init publish error");
     };
-    socket
+    publisher
 }
 
 async fn create_writer_thread(
@@ -194,7 +202,7 @@ async fn create_writer_thread(
             };
 
             // Send a message to the corresponding message queue
-            for (symbol, data_byte) in data_vec {
+            for (symbol, mut data_byte) in data_vec {
                 let key = if period.len() != 0 {
                     format!(
                         "{}_{}_{}_{}_{}",
@@ -215,7 +223,12 @@ async fn create_writer_thread(
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
                 };
-                writer_mq.write(&data_byte).await.unwrap();
+                if writer_mq.write_all(&mut data_byte).is_err() 
+                || writer_mq.flush().is_err() {
+                    continue;
+                }
+                // writer_mq.
+                // (&data_byte).await.unwrap();
             }
 
             // copy to redis
@@ -225,7 +238,7 @@ async fn create_writer_thread(
         }
     })
     .await
-    .expect("create_nanomsg_writer_thread failed");
+    .expect("create_writer_thread failed");
 }
 
 pub fn create_writer_threads(
