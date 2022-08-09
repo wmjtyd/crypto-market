@@ -10,7 +10,7 @@ axum =  {version = "0.5.13", features = ["headers","ws"] }
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version="0.3", features = ["env-filter"] }
-tower-http = { version = "0.2.0", features = ["fs", "trace"] }
+tower-http = { version = "0.3.4", features = ["fs", "trace"] }
 headers = "0.3"
 # crypto-markets = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
 # crypto-market-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
@@ -32,6 +32,12 @@ toml = "0.5.9"
 [dependencies.crypto-crawler]
 git = "https://github.com/wmjtyd/crypto-crawler-rs"
 rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
+
+[dependencies.wmjtyd-libstock]
+git = "https://github.com/wmjtyd/libstock.git"
+default-features = false
+features = ["crypto", "zeromq", "slack"]
+branch = "develop"
 
 [dependencies.crypto-msg-parser]
 git = "https://github.com/wmjtyd/crypto-crawler-rs"

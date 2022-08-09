@@ -27,6 +27,13 @@ use axum::http::HeaderValue;
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use websocket::{config::config::ApplicationConfig, init_config};
+// use wmjtyd_libstock::file::reader::FileReader;
+// use wmjtyd_libstock::data::bbo::decode_bbo;
+
+use wmjtyd_libstock::file::reader::FileReader;
+use wmjtyd_libstock::data::bbo::BboStructure;
+use wmjtyd_libstock::data::kline::KlineStructure;
+use wmjtyd_libstock::data::serializer::StructDeserializer;
 
 #[tokio::main]
 async fn main() {
@@ -79,7 +86,7 @@ async fn handle_socket(
             if let Ok(msg) = msg {
                 match msg {
                     RawMessage::Text(t) => {
-                        let actions = processing_requests(&t, &state).await;
+                        let actions = processing_requests(&t, &state,&mut socket).await;
                         socket.send(RawMessage::Text(actions)).await.unwrap();
                     }
                     RawMessage::Binary(_) => {
@@ -191,6 +198,31 @@ pub fn filename(params: &Params) -> String{
     // }
     // files
 }
+pub fn fileNamePartData(params: &Params) -> String{
+    // let mut files = Vec::new();
+    let exchange = &params.exchange;
+    let market_type = &params.market_type;
+    let msg_type = &params.msg_type;
+    let symbol = &params.symbols;
+    let date = &params.date;
+    // date+ "/" + exchange+market_type+msg_type+symbol
+    // format!("{}/{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol);
+    // let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
+    // let end_datetime = Utc.timestamp(params.end_datetime, 0);
+    // let days = (end_datetime - begin_datetime).num_days();
+    let fileName = if let Some(period) = &params.period {
+        if period.is_empty() {
+            format!("{}_{}_{}_{}",exchange, market_type, msg_type, symbol)
+        }else {
+            format!("{}_{}_{}_{}_{}",exchange, market_type, msg_type, symbol,period)
+        }
+
+    } else {
+        format!("{}_{}_{}_{}",exchange, market_type, msg_type, symbol)
+    };
+    fileName
+
+}
 
 #[derive(Deserialize)]
 pub struct Params {
@@ -202,6 +234,7 @@ pub struct Params {
     // pub begin_datetime: i64,
     // pub end_datetime: i64,
     pub date:String,
+    pub day:Option<i64>
 }
 #[derive(Serialize, Deserialize)]
 pub struct Action {
@@ -214,39 +247,58 @@ pub struct Action {
 pub struct AppState {
     pub receiver: Arc<Mutex<HashMap<i64, Receiver<Message>>>>,
 }
-pub async fn processing_requests(str: &str, state: &AppState) -> String {
+pub async fn processing_requests(str: &str, state: &AppState, socket: &mut WebSocket) -> String {
+    println!("{}",str);
     let params: Action = serde_json::from_str(str).unwrap();
     if let Some(echo) = params.echo {
         let result = String::new();
-        let receiver = state.receiver.clone();
-        tokio::task::spawn_blocking(move || {
-            let locked = receiver.lock().unwrap();
-            let receiver = locked.get(&echo).unwrap();
-            for msg in receiver {
-                let msg: Message = msg;
-                let received_at = msg.received_at as i64;
+        let param:Params= serde_json::from_str(&params.params.to_string()).unwrap();
+        let fileName = fileNamePartData(&param);
+        let day = if let Some(day) = param.day {
+             day
+        }else{
+             0
+        };
+        //0是单天 1是昨天 2 前天 - 8
+        let r = FileReader::new(fileName, day);
 
-                let orderbook = parse_l2_topk(
-                    params.params["symbol"].as_str().unwrap(),
-                    MarketType::Spot,
-                    &(msg as Message).json,
-                    Some(received_at),
-                )
-                .unwrap();
-                let orderbook = &orderbook[0];
-                result.clone().push_str(&json!(orderbook).to_string());
-                break;
-            }
-        })
-        .await
-        .unwrap();
+        for i in r.unwrap() {
+            println!("{:?}", i);
+            socket.send(RawMessage::Text(json!(i).to_string())).await.unwrap();
+            // socket.
+        }
+        // let receiver = state.receiver.clone();
+        //0是单天 1是昨天 2 前天 - 8
+        // let r = FileReader::new("binance_spot_candlestick_BTCUSDT_60".to_string(), 9);
+        //
+        // for i in r.unwrap() {
+        //     println!("{:?}", i);
+        // }
+
+            // let locked = receiver.lock();
+            // println!("{:?}",locked);
+            // let xx = locked.unwrap();
+            // println!("{:?}",xx);
+            // let receiver = xx.get(&echo).unwrap();
+            // println!("22{:?}",receiver);
+            // for msg in receiver {
+            //     let msg: Message = msg;
+            //     println!("1111{}",msg);
+            //     let received_at = msg.received_at as i64;
+            //
+            //
+            //     // let orderbook = &orderbook[0];
+            //     // result.clone().push_str(&json!(orderbook).to_string());
+            //     // break;
+            // }
+
     } else {
         if params.action == "subscribe" {
-            let mut receiver = state.receiver.lock().unwrap();
-            let (_tx, rx) = std::sync::mpsc::channel();
+            // let mut receiver = state.receiver.lock().unwrap();
+            // let (_tx, rx) = std::sync::mpsc::channel();
             let mut rng = rand::thread_rng();
             let y = rng.gen::<i64>();
-            receiver.insert(y, rx);
+            // receiver.insert(y, rx);
             return "{\"echo\":".to_string() + &y.to_string() + "}";
         }
         if params.action == "unsubscribe" {
