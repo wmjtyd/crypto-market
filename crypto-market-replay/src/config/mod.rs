@@ -19,7 +19,7 @@ impl ApplicationConfig {
             Ok(e) => e,
             Err(e) => panic!("{}", e),
         };
-        println!("{:?}",config);
+        println!("{:?}", config);
         config
     }
 }

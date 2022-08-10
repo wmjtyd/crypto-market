@@ -1,16 +1,14 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::Arc;
 
 use anyhow::Context;
+pub use arcstr::ArcStr;
 use notify::{EventHandler, EventKind};
 use serde::Deserialize;
-use tokio::{runtime::Handle, task::JoinHandle};
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 use tracing::instrument;
-
-pub use arcstr::ArcStr;
 
 pub type IpcType = usize;
 pub type IpcUrl = ArcStr;

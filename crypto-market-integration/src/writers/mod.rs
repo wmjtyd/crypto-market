@@ -1,47 +1,40 @@
-use crypto_crawler::*;
-use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade, parse_funding_rate};
-use futures::{future::BoxFuture, FutureExt};
-use log::*;
-
-use wmjtyd_libstock::message::{zeromq::ZeromqPublisher, traits::Bind};
-use wmjtyd_libstock::message::traits::SyncPublisher;
-
-
-
+use std::collections::HashMap;
 use std::io::Write;
-use std::{
-    collections::HashMap,
-    sync::{
-        mpsc::{Receiver, Sender},
-        Arc,
-    }
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
+
+use crypto_crawler::*;
+use crypto_msg_parser::{
+    parse_bbo,
+    parse_candlestick,
+    parse_funding_rate,
+    parse_l2,
+    parse_l2_topk,
+    parse_trade,
 };
-
-
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use log::*;
+use wmjtyd_libstock::data::bbo::BboStructure;
+use wmjtyd_libstock::data::funding_rate::FundingRateStructure;
+use wmjtyd_libstock::data::kline::KlineStructure;
+use wmjtyd_libstock::data::orderbook::OrderbookStructure;
 use wmjtyd_libstock::data::serializer::StructSerializer;
-
-use wmjtyd_libstock::data::{
-    bbo::BboStructure,
-    kline::KlineStructure,
-    orderbook::OrderbookStructure,
-    trade::TradeStructure,
-    funding_rate::FundingRateStructure,
-};
+use wmjtyd_libstock::data::trade::TradeStructure;
+use wmjtyd_libstock::message::traits::{Bind, SyncPublisher};
+use wmjtyd_libstock::message::zeromq::ZeromqPublisher;
 
 pub trait Writer {
     fn write(&mut self, s: &str);
     fn close(&mut self);
 }
 
-
 // Quickly create a message queue
-async fn create(name: &str) -> impl SyncPublisher  {
+async fn create(name: &str) -> impl SyncPublisher {
     let file_name = name.replacen('/', "-", 3);
 
-    let ipc_exchange_market_type_msg_type =
-        format!("ipc:///tmp/{}.ipc", file_name);
-    
-    
+    let ipc_exchange_market_type_msg_type = format!("ipc:///tmp/{}.ipc", file_name);
+
     if let Ok(mut publisher) = ZeromqPublisher::new() {
         if publisher.bind(&ipc_exchange_market_type_msg_type).is_err() {
             // 以后需要处理一下
@@ -62,7 +55,7 @@ async fn create_writer_thread(
     period: Arc<String>,
 ) {
     tokio::task::spawn(async move {
-        let mut writers= HashMap::new();
+        let mut writers = HashMap::new();
 
         for msg in rx {
             debug!("msg ->> yes");
@@ -95,7 +88,6 @@ async fn create_writer_thread(
                         }
                         data_vec.push((symbol, byte_data));
                     };
-                    
                 }
                 MessageType::Trade => {
                     let trade_msg = tokio::task::spawn_blocking(move || {
@@ -103,7 +95,6 @@ async fn create_writer_thread(
                     })
                     .await
                     .unwrap();
-
 
                     for trdate in trade_msg {
                         let symbol = trdate.symbol.to_owned();
@@ -179,16 +170,20 @@ async fn create_writer_thread(
                     let funding_rate_msg = tokio::task::spawn_blocking(move || {
                         println!("{}", msg_r.json);
                         parse_funding_rate(exchange, market_type, &msg_r.json, Some(1232))
-                    }).await.unwrap().unwrap();
+                    })
+                    .await
+                    .unwrap()
+                    .unwrap();
 
                     for mut funding_rate in funding_rate_msg {
-
-                        if  None == funding_rate.estimated_rate  {
+                        if None == funding_rate.estimated_rate {
                             funding_rate.estimated_rate = Some(0.0);
                         }
 
                         let symbol = funding_rate.symbol.to_owned();
-                        if let Ok(funding_rate_structure) = FundingRateStructure::try_from(&funding_rate) {
+                        if let Ok(funding_rate_structure) =
+                            FundingRateStructure::try_from(&funding_rate)
+                        {
                             let mut byte_data = Vec::new();
                             if funding_rate_structure.serialize(&mut byte_data).is_err() {
                                 continue;
@@ -196,7 +191,6 @@ async fn create_writer_thread(
                             data_vec.push((symbol, byte_data));
                         };
                     }
-
                 }
                 _ => panic!("Not implemented"),
             };
@@ -223,8 +217,7 @@ async fn create_writer_thread(
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
                 };
-                if writer_mq.write_all(&data_byte).is_err() 
-                || writer_mq.flush().is_err() {
+                if writer_mq.write_all(&data_byte).is_err() || writer_mq.flush().is_err() {
                     continue;
                 }
                 // writer_mq.
@@ -250,7 +243,5 @@ pub fn create_writer_threads(
     msg_type: MessageType,
     period: Arc<String>,
 ) -> Vec<BoxFuture<'static, ()>> {
-    vec![
-        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed()
-    ]
+    vec![create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed()]
 }

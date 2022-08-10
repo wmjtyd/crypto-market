@@ -1,6 +1,6 @@
-use wmjtyd_libstock::file::reader::FileReader;
 use wmjtyd_libstock::data::orderbook::OrderbookStructure;
 use wmjtyd_libstock::data::serializer::StructDeserializer;
+use wmjtyd_libstock::file::reader::FileReader;
 
 fn main() {
     let r = FileReader::new("binance_spot_l2_topk_BTCUSDT".to_string(), 0);

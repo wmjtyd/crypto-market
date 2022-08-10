@@ -1,31 +1,27 @@
 extern crate net2;
 
-use net2::UdpBuilder;
-use tokio::{runtime::Handle};
-use wmjtyd_libstock::message::traits::{Connect, Subscribe, StreamExt};
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
+use crossbeam_channel::Sender;
+use net2::UdpBuilder;
+use tokio::runtime::Handle;
+use wmjtyd_libstock::message::traits::{Connect, StreamExt, Subscribe};
 use wmjtyd_libstock::message::zeromq::ZeromqSubscriber;
 
-use crossbeam_channel::Sender;
-
 mod file;
-use file::{DynamicConfigHandler, IpcUrl};
-
 use crossbeam_channel::unbounded as channel;
+use file::{DynamicConfigHandler, IpcUrl};
 
 use crate::file::create_watcher;
 
-
-async fn receive_data(url: IpcUrl, sender: &Sender<Vec<u8>>)  {
+async fn receive_data(url: IpcUrl, sender: &Sender<Vec<u8>>) {
     tracing::info!("handle ipc {}", url);
     if let Ok(mut subscriber) = ZeromqSubscriber::new() {
-        if subscriber.connect(&url).is_err() 
-        || subscriber.subscribe(b"").is_err() {
+        if subscriber.connect(&url).is_err() || subscriber.subscribe(b"").is_err() {
             tracing::error!("connect error");
         }
-        
+
         loop {
             let message = StreamExt::next(&mut subscriber).await;
             if message.is_none() {
@@ -37,18 +33,17 @@ async fn receive_data(url: IpcUrl, sender: &Sender<Vec<u8>>)  {
                         tracing::error!("tx stop!");
                         break;
                     };
-                },
+                }
                 Err(msg) => {
                     println!("data error");
                     println!("{:?}", msg);
                     break;
-                },
+                }
             }
         }
-        
+
         tracing::info!("send stop; url -> {}", url);
     }
-
 }
 
 pub fn server(ip: &str, port: &str, config_path: &str) {
@@ -90,9 +85,8 @@ pub fn server(ip: &str, port: &str, config_path: &str) {
     tracing::info!("server status [start]");
 
     for data in rx {
-        let size = socket
-            .send_to(&data, &addr);
-            
+        let size = socket.send_to(&data, &addr);
+
         if let Ok(size) = size {
             tracing::debug!("send {}", size);
         } else {

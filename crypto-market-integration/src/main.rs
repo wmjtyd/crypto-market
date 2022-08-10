@@ -1,10 +1,12 @@
+use std::str::FromStr;
+use std::sync::Arc;
+
 use clap::clap_app;
 use crypto_crawler::*;
 use crypto_market_integration::{crawl_other, create_writer_threads};
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use log::*;
-use std::{str::FromStr, sync::Arc};
 
 pub async fn crawl(
     exchange: &'static str,

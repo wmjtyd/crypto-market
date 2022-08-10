@@ -1,14 +1,11 @@
-use std::{
-    collections::{HashMap, HashSet},
-    net::{self, SocketAddr},
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::collections::{HashMap, HashSet};
+use std::net::{self, SocketAddr};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
-use mio::{net::UdpSocket};
+use mio::net::UdpSocket;
 use quiche::Config;
 use ring::rand::SystemRandom;
-
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
@@ -52,7 +49,7 @@ pub fn create_server(addr: SocketAddr, ipc: String, config: Config) {
 
     let socket = Arc::new(socket);
 
-    let ipcs= vec![ipc];
+    let ipcs = vec![ipc];
 
     // 套字节
     let socket_clone = socket.clone();
@@ -259,7 +256,6 @@ fn server_connection(mut poll: mio::Poll, socket: Arc<UdpSocket>, mut config: Co
 
             debug!("{} processed {} bytes", client.conn.trace_id(), read);
 
-
             println!("is !!!!!!!!!!!!!");
             if client.conn.is_in_early_data() || client.conn.is_established() {
                 // Handle writable streams.
@@ -325,14 +321,12 @@ fn server_alive_check() {
 }
 
 fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
-
     let mut client_sub_lock = CLIENT_SUBSCRIBE.lock().unwrap();
 
     for ipc in ipcs {
-    client_sub_lock.insert(ipc, HashSet::new());
+        client_sub_lock.insert(ipc, HashSet::new());
     }
     // client_sub_lock.extend(iter)
-
 
     let topics = client_sub_lock.keys();
     for topic in topics {
@@ -343,24 +337,20 @@ fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
 
         debug!("{}", ipc_url);
         tokio::task::spawn(async move {
-            use wmjtyd_libstock::message::{
-                zeromq::ZeromqSubscriber,
-                traits::{Subscribe,Connect}
-            };
+            use wmjtyd_libstock::message::traits::{Connect, Subscribe};
+            use wmjtyd_libstock::message::zeromq::ZeromqSubscriber;
 
             let mut subscriber = ZeromqSubscriber::new().expect("init subscriber error");
-            if subscriber.connect(&ipc_url).is_err()
-            || subscriber.subscribe(b"").is_err() {
+            if subscriber.connect(&ipc_url).is_err() || subscriber.subscribe(b"").is_err() {
                 return;
             }
 
             loop {
-                
                 let message = subscriber.next();
                 if message.is_none() {
                     continue;
                 }
-                
+
                 match message.unwrap() {
                     Ok(message) => {
                         debug!("sub data len: {}", message.len());
@@ -388,7 +378,7 @@ fn distribute(socket: Arc<UdpSocket>, key: String, data: &[u8]) {
     };
     let mut clients = CLIENT_LIST.lock().unwrap();
     let mut out = [0u8; 1024];
-    
+
     for cid in sub {
         let client = clients.get_mut(cid).unwrap();
 
@@ -526,11 +516,11 @@ fn handle_sub(
     // sub@xxx_xxx
     //  or
     // sub@xxx_xx;sub@xxx_xxx
-    for action  in actions.split(';') {
+    for action in actions.split(';') {
         let command: Vec<&str> = action.split('@').collect();
         if command.len() != 2 {
             break;
-            }
+        }
 
         let msg = match command[0] {
             "sub" => {
@@ -540,29 +530,26 @@ fn handle_sub(
                     Ok("Success sub")
                 } else {
                     Err("Subscription does not exist")
-        }
-            },
+                }
+            }
             "unsub" => {
                 if let Some(client_sub_list) = client_sub_lock.get_mut(command[1]) {
                     client_sub_list.remove(&cid);
                     debug!("{:?} unsub {}", cid, command[1]);
                     Ok("Success nusub")
-    } else {
+                } else {
                     Err("Subscription does not exist")
                 }
             }
-            _ => {
-                Err("error: Non-existent Action")
-            }
+            _ => Err("error: Non-existent Action"),
         };
         match msg {
             Err(msg) => {
                 let msg = format!("ERROR: {}", msg);
-                _ = client.conn.stream_send(
-                    write_stream_id,
-                    msg.as_bytes(),
-                    false);
-                warn!("cid: {:?}; {}", cid,msg);
+                _ = client
+                    .conn
+                    .stream_send(write_stream_id, msg.as_bytes(), false);
+                warn!("cid: {:?}; {}", cid, msg);
             }
             Ok(msg) => {
                 debug!("cid: {:?}; {}", cid, msg)

@@ -25,12 +25,11 @@ async fn main() {
             crypto_market_multicast::server(ip, port, config_path);
         }
         "client" => {
-
             let rx = crypto_market_multicast::client(ip, port);
             while let Ok(data) = rx.recv() {
                 println!("{:?}", data);
             }
         }
-        _ => panic!("error mode <server> or <client>")
+        _ => panic!("error mode <server> or <client>"),
     };
 }

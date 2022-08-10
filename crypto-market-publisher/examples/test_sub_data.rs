@@ -1,6 +1,9 @@
-use std::{thread, time::Duration, io::Write};
-use wmjtyd_libstock::message::{zeromq::ZeromqPublisher, traits::Bind};
+use std::io::Write;
+use std::thread;
+use std::time::Duration;
 
+use wmjtyd_libstock::message::traits::Bind;
+use wmjtyd_libstock::message::zeromq::ZeromqPublisher;
 
 #[tokio::main]
 async fn main() {
@@ -11,7 +14,9 @@ async fn main() {
 
     let mut package_num = 0;
     loop {
-        publisher.write_all(format!("{package_num}").as_bytes()).expect("write_all error");
+        publisher
+            .write_all(format!("{package_num}").as_bytes())
+            .expect("write_all error");
         thread::sleep(Duration::from_millis(400));
         package_num += 1;
     }
