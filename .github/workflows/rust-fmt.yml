@@ -1,0 +1,39 @@
+name: Cargo fmt
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Format codebase
+        run: cargo fmt
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+            token: ${{ github.token }}
+            commit-message: 'style: cargo fmt [skip ci]'
+            author: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+            branch: cargo-fmt
+            delete-branch: true
+            title: 'style: cargo fmt'
+            labels: ci:style
