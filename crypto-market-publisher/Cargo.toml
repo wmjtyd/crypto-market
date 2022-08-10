@@ -11,10 +11,10 @@ mio = { version = "0.8", features = ["net", "os-poll"] }
 ring = "0.16"
 lazy_static = "1"
 log = { version = "0.4", features = ["std"] }
-tokio = { version = "1.18.2", features = ["rt-multi-thread",  "time", "sync", "macros"] }
-clap = "~2.27.0"
+tokio = { version = "1.20.1", features = ["rt-multi-thread",  "time", "sync", "macros"] }
+clap = "~2.27.1"
 env_logger = "0.4.3"
-url = "1"
+url = "2"
 rustls = "0.20.6"
 
 [dependencies.crypto-msg-parser]
