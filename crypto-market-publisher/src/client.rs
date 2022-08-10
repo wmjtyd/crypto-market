@@ -152,7 +152,7 @@ pub fn client(
             debug!("sending sub {:?}", subscribe_list);
             let mut data = Vec::new();
             for sub in &subscribe_list {
-                data.extend_from_slice(&format!("sub@{};", sub).as_bytes());
+                data.extend_from_slice(format!("sub@{};", sub).as_bytes());
             }
 
             debug!("{:?}", String::from_utf8(data[..data.len() - 1].to_vec()));

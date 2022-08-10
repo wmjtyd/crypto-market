@@ -9,10 +9,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use crypto_crawler::{MarketType, Message};
+use crypto_crawler::{Message};
 
-use chrono::{Duration, TimeZone, Utc};
-use crypto_msg_parser::parse_l2_topk;
+
+
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -22,18 +22,18 @@ use std::{
     net::SocketAddr,
     sync::{mpsc::Receiver, Arc},
 };
-use std::{ops::Add, sync::Mutex};
+use std::{sync::Mutex};
 use axum::http::HeaderValue;
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
-use websocket::{config::config::ApplicationConfig, init_config};
+use websocket::{config::ApplicationConfig, init_config};
 // use wmjtyd_libstock::file::reader::FileReader;
 // use wmjtyd_libstock::data::bbo::decode_bbo;
 
 use wmjtyd_libstock::file::reader::FileReader;
-use wmjtyd_libstock::data::bbo::BboStructure;
-use wmjtyd_libstock::data::kline::KlineStructure;
-use wmjtyd_libstock::data::serializer::StructDeserializer;
+
+
+
 
 #[tokio::main]
 async fn main() {
@@ -169,7 +169,8 @@ pub fn filename(params: &Params) -> String{
     // let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
     // let end_datetime = Utc.timestamp(params.end_datetime, 0);
     // let days = (end_datetime - begin_datetime).num_days();
-    let fileName = if let Some(period) = &params.period {
+    
+    if let Some(period) = &params.period {
         if period.is_empty() {
             format!("/{}/{}_{}_{}_{}",date,exchange, market_type, msg_type, symbol)
         }else {
@@ -178,8 +179,7 @@ pub fn filename(params: &Params) -> String{
         // format!("/{}/{}_{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol,period)
     } else {
         format!("/{}/{}_{}_{}_{}",date,exchange, market_type, msg_type, symbol)
-    };
-    fileName
+    }
     // let mut datetime = format!("{}", begin_datetime.format("%Y%m%d"));
     //循环
     // for _i in 0..days {
@@ -198,19 +198,20 @@ pub fn filename(params: &Params) -> String{
     // }
     // files
 }
-pub fn fileNamePartData(params: &Params) -> String{
+pub fn file_name_part_data(params: &Params) -> String{
     // let mut files = Vec::new();
     let exchange = &params.exchange;
     let market_type = &params.market_type;
     let msg_type = &params.msg_type;
     let symbol = &params.symbols;
-    let date = &params.date;
+    let _date = &params.date;
     // date+ "/" + exchange+market_type+msg_type+symbol
     // format!("{}/{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol);
     // let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
     // let end_datetime = Utc.timestamp(params.end_datetime, 0);
     // let days = (end_datetime - begin_datetime).num_days();
-    let fileName = if let Some(period) = &params.period {
+    
+    if let Some(period) = &params.period {
         if period.is_empty() {
             format!("{}_{}_{}_{}",exchange, market_type, msg_type, symbol)
         }else {
@@ -219,8 +220,7 @@ pub fn fileNamePartData(params: &Params) -> String{
 
     } else {
         format!("{}_{}_{}_{}",exchange, market_type, msg_type, symbol)
-    };
-    fileName
+    }
 
 }
 
@@ -250,17 +250,17 @@ pub struct AppState {
 pub async fn processing_requests(str: &str, state: &AppState, socket: &mut WebSocket) -> String {
     println!("{}",str);
     let params: Action = serde_json::from_str(str).unwrap();
-    if let Some(echo) = params.echo {
-        let result = String::new();
+    if let Some(_echo) = params.echo {
+        let _result = String::new();
         let param:Params= serde_json::from_str(&params.params.to_string()).unwrap();
-        let fileName = fileNamePartData(&param);
+        let file_name = file_name_part_data(&param);
         let day = if let Some(day) = param.day {
              day
         }else{
              0
         };
         //0是单天 1是昨天 2 前天 - 8
-        let r = FileReader::new(fileName, day);
+        let r = FileReader::new(file_name, day);
 
         for i in r.unwrap() {
             println!("{:?}", i);
@@ -309,5 +309,5 @@ pub async fn processing_requests(str: &str, state: &AppState, socket: &mut WebSo
         }
     }
 
-    return "".to_string();
+    "".to_string()
 }

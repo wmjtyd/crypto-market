@@ -35,13 +35,14 @@ pub trait Writer {
 
 
 // Quickly create a message queue
-async fn create(name: &String) -> impl SyncPublisher  {
-    let file_name = name.replacen("/", "-", 3);
+async fn create(name: &str) -> impl SyncPublisher  {
+    let file_name = name.replacen('/', "-", 3);
 
     let ipc_exchange_market_type_msg_type =
         format!("ipc:///tmp/{}.ipc", file_name);
     
-    let publisher = if let Ok(mut publisher) = ZeromqPublisher::new() {
+    
+    if let Ok(mut publisher) = ZeromqPublisher::new() {
         if publisher.bind(&ipc_exchange_market_type_msg_type).is_err() {
             // 以后需要处理一下
             panic!("ipc bind error {}", ipc_exchange_market_type_msg_type);
@@ -49,8 +50,7 @@ async fn create(name: &String) -> impl SyncPublisher  {
         publisher
     } else {
         panic!("init publish error");
-    };
-    publisher
+    }
 }
 
 async fn create_writer_thread(
@@ -202,7 +202,7 @@ async fn create_writer_thread(
             };
 
             // Send a message to the corresponding message queue
-            for (symbol, mut data_byte) in data_vec {
+            for (symbol, data_byte) in data_vec {
                 let key = if period.len() != 0 {
                     format!(
                         "{}_{}_{}_{}_{}",
@@ -223,7 +223,7 @@ async fn create_writer_thread(
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
                 };
-                if writer_mq.write_all(&mut data_byte).is_err() 
+                if writer_mq.write_all(&data_byte).is_err() 
                 || writer_mq.flush().is_err() {
                     continue;
                 }
@@ -250,11 +250,7 @@ pub fn create_writer_threads(
     msg_type: MessageType,
     period: Arc<String>,
 ) -> Vec<BoxFuture<'static, ()>> {
-    let mut threads = Vec::new();
-
-    threads.push(
-        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed(),
-    );
-
-    threads
+    vec![
+        create_writer_thread(rx, None, exchange, market_type, msg_type, period).boxed()
+    ]
 }
