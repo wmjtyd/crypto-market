@@ -7,17 +7,17 @@ edition = "2021"
 
 [dependencies]
 net2 = "0.2"
-clap = "~2.27.0"
-tokio = { version = "1.18.2", features = ["rt-multi-thread", "macros"] }
+clap = "~2.27.1"
+tokio = { version = "1.20.1", features = ["rt-multi-thread", "macros"] }
 notify = "5.0.0-pre.15"
 log = { version = "0.4.17", features = ["std"] }
-tracing = "0.1.35"
-serde = { version = "1.0.140", features = ["derive"] }
-serde_json = "1.0.82"
-anyhow = { version = "1.0.58", features = ["backtrace"] }
+tracing = "0.1.36"
+serde = { version = "1.0.143", features = ["derive"] }
+serde_json = "1.0.83"
+anyhow = { version = "1.0.60", features = ["backtrace"] }
 arcstr = { version = "1.1.4", features = ["serde"] }
 crossbeam-channel = "0.5.6"
-tracing-subscriber = "0.3.14"
+tracing-subscriber = "0.3.15"
 
 
 [dependencies.wmjtyd-libstock]
