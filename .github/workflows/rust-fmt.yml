@@ -1,12 +1,12 @@
 name: Cargo fmt
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
   workflow_dispatch:
 
@@ -30,10 +30,10 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v4
         with:
-            token: ${{ github.token }}
-            commit-message: 'style: cargo fmt [skip ci]'
-            author: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
-            branch: cargo-fmt
-            delete-branch: true
-            title: 'style: cargo fmt'
-            labels: ci:style
+          token: ${{ github.token }}
+          commit-message: "style: cargo fmt [skip ci]"
+          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          branch: cargo-fmt
+          delete-branch: true
+          title: "style: cargo fmt"
+          labels: ci:style

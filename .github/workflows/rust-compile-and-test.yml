@@ -14,25 +14,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-matrix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - id: set-matrix
-        run: |
-          feature="$(python3 scripts/list_all_possible_features.py)"
-          echo "::set-output name=feature::$feature"
-    outputs:
-      feature: ${{ steps.set-matrix.outputs.feature }}
-
   build:
-    needs: build-matrix
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: true
-      matrix:
-        features: ${{ fromJson(needs.build-matrix.outputs.feature) }}
 
     steps:
       - uses: actions/checkout@v3
@@ -40,15 +23,8 @@ jobs:
       - name: Install nanomsg
         run: bash scripts/ci_install_nanomsg.sh
       - name: Build
-        run: |
-          for f in ${{ matrix.features }}; do
-            echo -e "\ninfo: building with $f"
-            cargo build --no-default-features --verbose -F "$f" || exit 1
-          done
+        run: cargo build --workspace || exit 1
       - name: Run tests
         run: |
-          for f in ${{ matrix.features }}; do
-            echo -e "\ninfo: testing with $f"
-            cargo nextest run --no-default-features --verbose -F "$f" || exit 2
-            cargo test --doc --no-default-features --verbose -F "$f" || exit 3
-          done
+          cargo nextest run --workspace || exit 2
+          cargo test --doc --workspace || exit 3
