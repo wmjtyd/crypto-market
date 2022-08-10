@@ -2,10 +2,13 @@ use crypto_crawler::*;
 use crypto_msg_parser::{parse_bbo, parse_candlestick, parse_l2, parse_l2_topk, parse_trade, parse_funding_rate};
 use futures::{future::BoxFuture, FutureExt};
 use log::*;
-use tokio::io::AsyncWriteExt;
-use wmjtyd_libstock::message::zeromq::Pub;
-use wmjtyd_libstock::message::zeromq::Zeromq;
 
+use wmjtyd_libstock::message::{zeromq::ZeromqPublisher, traits::Bind};
+use wmjtyd_libstock::message::traits::SyncPublisher;
+
+
+
+use std::io::Write;
 use std::{
     collections::HashMap,
     sync::{
@@ -15,12 +18,14 @@ use std::{
 };
 
 
+use wmjtyd_libstock::data::serializer::StructSerializer;
+
 use wmjtyd_libstock::data::{
-    bbo::encode_bbo,
-    kline::encode_kline,
-    orderbook::encode_orderbook,
-    trade::encode_trade,
-    funding_rate::encode_funding_rate,
+    bbo::BboStructure,
+    kline::KlineStructure,
+    orderbook::OrderbookStructure,
+    trade::TradeStructure,
+    funding_rate::FundingRateStructure,
 };
 
 pub trait Writer {
@@ -30,17 +35,22 @@ pub trait Writer {
 
 
 // Quickly create a message queue
-async fn create(name: &String) -> impl tokio::io::AsyncWriteExt  {
+async fn create(name: &String) -> impl SyncPublisher  {
     let file_name = name.replacen("/", "-", 3);
 
     let ipc_exchange_market_type_msg_type =
         format!("ipc:///tmp/{}.ipc", file_name);
     
-    let socket = match Zeromq::<Pub>::new(&ipc_exchange_market_type_msg_type).await {
-        Ok(v) =>  v,
-        Err(msg) => panic!("init publish error: {}; msg: {:?}", ipc_exchange_market_type_msg_type, msg)
+    let publisher = if let Ok(mut publisher) = ZeromqPublisher::new() {
+        if publisher.bind(&ipc_exchange_market_type_msg_type).is_err() {
+            // 以后需要处理一下
+            panic!("ipc bind error {}", ipc_exchange_market_type_msg_type);
+        }
+        publisher
+    } else {
+        panic!("init publish error");
     };
-    socket
+    publisher
 }
 
 async fn create_writer_thread(
@@ -76,10 +86,16 @@ async fn create_writer_thread(
                     .await
                     .unwrap();
 
-
                     let symbol = bbo_msg.symbol.to_owned();
-                    let byte_data = encode_bbo(&bbo_msg).unwrap();
-                    data_vec.push((symbol, byte_data));
+
+                    if let Ok(bbo_structure) = BboStructure::try_from(&bbo_msg) {
+                        let mut byte_data = Vec::new();
+                        if bbo_structure.serialize(&mut byte_data).is_err() {
+                            continue;
+                        }
+                        data_vec.push((symbol, byte_data));
+                    };
+                    
                 }
                 MessageType::Trade => {
                     let trade_msg = tokio::task::spawn_blocking(move || {
@@ -91,8 +107,15 @@ async fn create_writer_thread(
 
                     for trdate in trade_msg {
                         let symbol = trdate.symbol.to_owned();
-                        let byte_data = encode_trade(&trdate).unwrap();
-                        data_vec.push((symbol, byte_data));
+
+                        if let Ok(trade_structure) = TradeStructure::try_from(&trdate) {
+                            let mut byte_data = Vec::new();
+                            if trade_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
                 }
                 MessageType::L2Event => {
@@ -104,8 +127,14 @@ async fn create_writer_thread(
 
                     for orderbook in orderbook_msg {
                         let symbol = orderbook.symbol.to_owned();
-                        let byte_data = encode_orderbook(&orderbook).unwrap();
-                        data_vec.push((symbol, byte_data));
+
+                        if let Ok(order_book_structure) = OrderbookStructure::try_from(&orderbook) {
+                            let mut byte_data = Vec::new();
+                            if order_book_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
                 }
                 MessageType::L2TopK => {
@@ -119,8 +148,14 @@ async fn create_writer_thread(
 
                     for orderbook in orderbook_msg {
                         let symbol = orderbook.symbol.to_owned();
-                        let byte_data = encode_orderbook(&orderbook).unwrap();
-                        data_vec.push((symbol, byte_data));
+
+                        if let Ok(order_book_structure) = OrderbookStructure::try_from(&orderbook) {
+                            let mut byte_data = Vec::new();
+                            if order_book_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
                 }
                 MessageType::Candlestick => {
@@ -131,8 +166,14 @@ async fn create_writer_thread(
                     .unwrap();
 
                     let symbol = kline_msg.symbol.to_owned();
-                    let byte_data = encode_kline(&kline_msg).unwrap();
-                    data_vec.push((symbol, byte_data));
+
+                    if let Ok(kline_structure) = KlineStructure::try_from(&kline_msg) {
+                        let mut byte_data = Vec::new();
+                        if kline_structure.serialize(&mut byte_data).is_err() {
+                            continue;
+                        }
+                        data_vec.push((symbol, byte_data));
+                    };
                 }
                 MessageType::FundingRate => {
                     let funding_rate_msg = tokio::task::spawn_blocking(move || {
@@ -147,8 +188,13 @@ async fn create_writer_thread(
                         }
 
                         let symbol = funding_rate.symbol.to_owned();
-                        let byte_data = encode_funding_rate(&funding_rate).unwrap();
-                        data_vec.push((symbol, byte_data));
+                        if let Ok(funding_rate_structure) = FundingRateStructure::try_from(&funding_rate) {
+                            let mut byte_data = Vec::new();
+                            if funding_rate_structure.serialize(&mut byte_data).is_err() {
+                                continue;
+                            }
+                            data_vec.push((symbol, byte_data));
+                        };
                     }
 
                 }
@@ -156,7 +202,7 @@ async fn create_writer_thread(
             };
 
             // Send a message to the corresponding message queue
-            for (symbol, data_byte) in data_vec {
+            for (symbol, mut data_byte) in data_vec {
                 let key = if period.len() != 0 {
                     format!(
                         "{}_{}_{}_{}_{}",
@@ -177,7 +223,12 @@ async fn create_writer_thread(
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
                 };
-                writer_mq.write(&data_byte).await.unwrap();
+                if writer_mq.write_all(&mut data_byte).is_err() 
+                || writer_mq.flush().is_err() {
+                    continue;
+                }
+                // writer_mq.
+                // (&data_byte).await.unwrap();
             }
 
             // copy to redis
@@ -187,7 +238,7 @@ async fn create_writer_thread(
         }
     })
     .await
-    .expect("create_nanomsg_writer_thread failed");
+    .expect("create_writer_thread failed");
 }
 
 pub fn create_writer_threads(

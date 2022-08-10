@@ -1,12 +1,57 @@
 extern crate net2;
 
 use net2::UdpBuilder;
+use tokio::{runtime::Handle};
+use wmjtyd_libstock::message::traits::{Connect, Subscribe, StreamExt};
 use std::net::Ipv4Addr;
 use std::str::FromStr;
-use tokio::io::AsyncReadExt;
-use wmjtyd_libstock::message::zeromq::{Sub, Zeromq};
 
-pub async fn server(ip: &str, port: &str, ipcs: Vec<&str>) {
+use wmjtyd_libstock::message::zeromq::ZeromqSubscriber;
+
+use crossbeam_channel::Sender;
+
+mod file;
+use file::{DynamicConfigHandler, IpcUrl};
+
+use crossbeam_channel::unbounded as channel;
+
+use crate::file::create_watcher;
+
+
+async fn receive_data(url: IpcUrl, sender: &Sender<Vec<u8>>)  {
+    tracing::info!("handle ipc {}", url);
+    if let Ok(mut subscriber) = ZeromqSubscriber::new() {
+        if subscriber.connect(&url).is_err() 
+        || subscriber.subscribe(b"").is_err() {
+            tracing::error!("connect error");
+        }
+        
+        loop {
+            let message = StreamExt::next(&mut subscriber).await;
+            if message.is_none() {
+                break;
+            }
+            match message.unwrap() {
+                Ok(message) => {
+                    if sender.send(message).is_err() {
+                        tracing::error!("tx stop!");
+                        break;
+                    };
+                },
+                Err(msg) => {
+                    println!("data error");
+                    println!("{:?}", msg);
+                    break;
+                },
+            }
+        }
+        
+        tracing::info!("send stop; url -> {}", url);
+    }
+
+}
+
+pub fn server(ip: &str, port: &str, config_path: &str) {
     // bind ip addr
     let socket = UdpBuilder::new_v4()
         .expect("cannot create UDP socket")
@@ -17,42 +62,46 @@ pub async fn server(ip: &str, port: &str, ipcs: Vec<&str>) {
 
     let addr = format!("{}:{}", ip, port);
 
-    let mut thread = Vec::new();
+    let handle = Handle::current();
 
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = channel::<Vec<u8>>();
 
-    for ipc in ipcs {
-        let ipc = ipc.to_owned();
-        let tx = tx.clone();
-        thread.push(tokio::task::spawn(async move {
-            //  message queue
-            let mut mq = Zeromq::<Sub>::new(&ipc)
-                .await
-                .expect(format!("sub error; ipc: {}", ipc).as_str());
-            mq.subscribe("").await.expect("sub error;");
+    let mut handler = DynamicConfigHandler::new(handle, {
+        Box::new(move |handle, _typ, url| {
+            let tx = tx.clone();
+            handle.spawn(async move {
+                receive_data(url, &tx).await;
+            })
+        })
+    });
 
-            let mut data = [0u8; 8192];
-
-            // Message pairs are used to obtain data and forward it to multicast
-            while let Ok(data_size) = mq.read(&mut data).await {
-                if 0 == data_size {
-                    break;
-                }
-                if tx.send(data[..data_size].to_vec()).is_err() {
-                    break;
-                }
-            }
-        }));
+    if handler.initiate(config_path).is_err() {
+        tracing::error!("config format; path -> {}", config_path);
+        panic!("server stop");
     }
 
-    while let Ok(data) = rx.recv() {
+    let watcher = create_watcher(config_path, handler);
+
+    if watcher.is_err() {
+        tracing::error!("create watcher; path -> {}", config_path);
+        panic!("server stop");
+    }
+
+    tracing::info!("server status [start]");
+
+    for data in rx {
         let size = socket
-            .send_to(&data, &addr)
-            .expect("cannot send");
+            .send_to(&data, &addr);
+            
+        if let Ok(size) = size {
+            tracing::debug!("send {}", size);
+        } else {
+            tracing::error!("multicast send error");
+            break;
+        }
     }
 
-
-    println!("end....");
+    tracing::info!("server status [stop]");
 }
 
 pub fn client(ip: &str, port: &str) -> std::sync::mpsc::Receiver<Vec<u8>> {

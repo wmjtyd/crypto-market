@@ -8,9 +8,7 @@ use std::{
 use mio::{net::UdpSocket};
 use quiche::Config;
 use ring::rand::SystemRandom;
-use wmjtyd_libstock::message::zeromq::Zeromq;
-use tokio::io::AsyncReadExt;
-use wmjtyd_libstock::message::zeromq::Sub;
+
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
@@ -337,20 +335,33 @@ fn server_send(ipcs: Vec<String>, socket: Arc<UdpSocket>) {
     for topic in client_sub_lock.keys() {
         let url = format!("ipc:///tmp/{}.ipc", topic);
         let topic = topic.to_owned();
-        let url = url.to_string();
+        let ipc_url = url.to_string();
         let network_socket = socket.clone();
 
-        debug!("{}", url);
+        debug!("{}", ipc_url);
         tokio::task::spawn(async move {
-            let mut socket = Zeromq::<Sub>::new(&url).await.unwrap();
-            socket.subscribe("").await.unwrap();
+            use wmjtyd_libstock::message::{
+                zeromq::ZeromqSubscriber,
+                traits::{Subscribe,Connect}
+            };
 
-            let mut buf = [0_u8;8192];
+            let mut subscriber = ZeromqSubscriber::new().expect("init subscriber error");
+            if subscriber.connect(&ipc_url).is_err()
+            || subscriber.subscribe(b"").is_err() {
+                return;
+            }
+
             loop {
-                match socket.read(&mut buf).await{
-                    Ok(buf_size) => {
-                        debug!("sub data len: {}", buf.len());
-                        distribute(network_socket.clone(), topic.to_string(), &buf[..buf_size]);
+                
+                let message = subscriber.next();
+                if message.is_none() {
+                    continue;
+                }
+                
+                match message.unwrap() {
+                    Ok(message) => {
+                        debug!("sub data len: {}", message.len());
+                        distribute(network_socket.clone(), topic.to_string(), &message);
                     }
                     Err(err) => {
                         debug!("Client failed to receive msg '{}'.", err);

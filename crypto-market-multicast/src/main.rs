@@ -2,40 +2,35 @@ use clap::clap_app;
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let matches: clap::ArgMatches = clap_app!(quic =>
-            (about: "Publish data in the form of multicast")
-            (@subcommand server =>
-                (@arg IP: +required "comma_seperated_symbols")
-                (@arg PORT: +required "comma_seperated_symbols")
-                (@arg IPC: +required +use_delimiter "comma_seperated_symbols")
-            )
-            (@subcommand client =>
-                (@arg IP: +required "comma_seperated_symbols")
-                (@arg PORT: +required "comma_seperated_symbols")
-            )
+        (about: "multiceast server and client")
+        (@arg MODE: -m "server or client; default server")
+        (@arg IP: --ip  "ip addr")
+        (@arg PORT: --port "ip port")
+        (@arg CONFIGPATH: -c "config path")
     )
     .get_matches();
 
-    match matches.subcommand() {
-        ("server", m) => {
-            let m = m.expect("command error");
-            let ip = m.value_of("IP").unwrap();
-            let port = m.value_of("PORT").unwrap();
+    let ip = matches.value_of("IP").unwrap_or("230.0.0.1");
+    let port = matches.value_of("PORT").unwrap_or("8888");
 
-            let ipc = m.values_of("IPC").unwrap().collect::<Vec<&str>>();
+    let config_path = matches.value_of("CONFIGPATH").unwrap_or("./conf/ipc.json");
 
-            crypto_market_multicast::server(ip, port, ipc).await;
+    let mode = matches.value_of("MODE").unwrap_or("server");
+
+    match mode {
+        "server" => {
+            crypto_market_multicast::server(ip, port, config_path);
         }
-        ("client", m) => {
-            let m = m.expect("command error");
-            let ip = m.value_of("IP").unwrap();
-            let port = m.value_of("PORT").unwrap();
+        "client" => {
 
             let rx = crypto_market_multicast::client(ip, port);
             while let Ok(data) = rx.recv() {
                 println!("{:?}", data);
             }
         }
-        _ => {}
+        _ => panic!("error mode <server> or <client>")
     };
 }

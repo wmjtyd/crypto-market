@@ -2,14 +2,16 @@
 
 use concat_string::concat_string;
 use tracing::error;
+
 use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
 
 // pub use file_writer::FileWriter;
 pub use wmjtyd_libstock::file::writer::DataWriter;
 
-use wmjtyd_libstock::message::zeromq::Zeromq;
-use tokio::io::AsyncReadExt;
-use wmjtyd_libstock::message::zeromq::Sub;
+
+use wmjtyd_libstock::message::zeromq::ZeromqSubscriber;
+use wmjtyd_libstock::message::traits::{Subscribe, Connect, StreamExt};
+
 
 pub trait Writer {
     fn write(&mut self, s: &str);
@@ -28,18 +30,31 @@ pub async fn create_write_file_thread(
     let task = async move {
         let mut data_writer = DataWriter::new();
         data_writer.start().await?;
-        let mut socket = Zeromq::<Sub>::new(&ipc_exchange_market_type_msg_type).await.unwrap();
-        socket.subscribe("").await.unwrap();
 
-        let mut buf = [0u8; 8192];
+
+        let mut subscriber = ZeromqSubscriber::new().expect("init error!");
+        if subscriber.connect(&ipc_exchange_market_type_msg_type).is_err()
+        || subscriber.subscribe(b"").is_err() {
+            // 这里有问题
+            return Ok(());
+        }
+
         tokio::task::spawn( async move { loop {
             // 数据 payload
-            let size = socket.read(&mut buf).await;
-            match size {
-                Ok(size) => {
+            tracing::debug!("start");
+            let message = StreamExt::next(&mut subscriber).await;
+            if message.is_none() {
+                break;
+            }
+
+            tracing::debug!("yes");
+
+            match message.unwrap() {
+                Ok(message) => {
+                    tracing::debug!("{:?}", message);
                     let result = data_writer.add(DataEntry {
                         filename: ipc.to_string(),
-                        data: buf[..size].to_vec(),
+                        data: message,
                     });
 
                     if let Err(e) = result {
@@ -77,18 +92,6 @@ pub enum RecorderWriterError {
 
     #[error("failed to create the writer thread: {0}")]
     CreateThreadFailed(#[from] tokio::task::JoinError),
-
-    #[error("failed to shutdown the socket: {0}")]
-    SocketShutdownFailed(nanomsg::Error),
-
-    #[error("failed to create a socket: {0}")]
-    SocketCreationFailed(nanomsg::Error),
-
-    #[error("failed to connect to a socket: {0}")]
-    SocketConnectionFailed(nanomsg::Error),
-
-    #[error("failed to subscribe to a socket: {0}")]
-    SocketSubscribeFailed(nanomsg::Error),
 }
 
 pub type RecorderWriterResult<T> = Result<T, RecorderWriterError>;
