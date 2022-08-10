@@ -17,24 +17,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-      pull-requests: write
-
     steps:
       - uses: actions/checkout@v3
 
       - name: Format codebase
-        run: cargo fmt
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
-        with:
-          token: ${{ github.token }}
-          commit-message: "style: cargo fmt [skip ci]"
-          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          branch: fmt/cargo-fmt
-          delete-branch: true
-          title: "style: cargo fmt"
-          labels: ci:style
-          base: ${{ github.head_ref }}
+        run: cargo fmt --check

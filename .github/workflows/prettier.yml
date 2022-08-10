@@ -24,17 +24,5 @@ jobs:
       - name: Install Prettier
         run: npm i -g prettier
 
-      - name: Format codebase
-        run: prettier -w .
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v4
-        with:
-          token: ${{ github.token }}
-          commit-message: "style: prettier [skip ci]"
-          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          branch: fmt/prettier
-          delete-branch: true
-          title: "style: prettier"
-          labels: ci:style
-          base: ${{ github.head_ref }}
+      - name: Check codebase format
+        run: prettier -c .
