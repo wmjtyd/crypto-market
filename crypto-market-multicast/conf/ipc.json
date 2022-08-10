@@ -1,9 +1,9 @@
 {
-    "ipcs": [
-        [3, "ipc:///tmp/binance_spot_l2_topk_BTCUSDT.ipc"],
-        [5, "ipc:///tmp/binance_linear_swap_funding_rate_BTCUSDT.ipc"],
-        [4, "ipc:///tmp/binance_spot_candlestick_BTCUSDT_60.ipc"],
-        [4, "ipc:///tmp/binance_linear_swap_candlestick_BTCUSDT_60.ipc"],
-        [3, "ipc:///tmp/kucoin_spot_l2_topk_BTC-USDT.ipc"]
-    ]
+  "ipcs": [
+    [3, "ipc:///tmp/binance_spot_l2_topk_BTCUSDT.ipc"],
+    [5, "ipc:///tmp/binance_linear_swap_funding_rate_BTCUSDT.ipc"],
+    [4, "ipc:///tmp/binance_spot_candlestick_BTCUSDT_60.ipc"],
+    [4, "ipc:///tmp/binance_linear_swap_candlestick_BTCUSDT_60.ipc"],
+    [3, "ipc:///tmp/kucoin_spot_l2_topk_BTC-USDT.ipc"]
+  ]
 }
