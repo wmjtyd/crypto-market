@@ -1,6 +1,6 @@
 extern crate log;
 
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{SocketAddr};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use quiche::Config;
@@ -27,7 +27,7 @@ pub fn client(
     let mut events = mio::Events::with_capacity(1024);
 
     // Resolve server address.
-    let peer_addr = url.to_socket_addrs().unwrap().next().unwrap();
+    let peer_addr = url.socket_addrs(|| None).unwrap()[0];
 
     // Bind to INADDR_ANY or IN6ADDR_ANY depending on the IP family of the
     // server address. This is needed on macOS and BSD variants that don't
