@@ -1,39 +1,26 @@
-use axum::{
-    body::StreamBody,
-    extract::{
-        ws::{Message as RawMessage, WebSocket, WebSocketUpgrade},
-        Extension, TypedHeader,
-    },
-    http::{header, StatusCode},
-    response::{Response, IntoResponse},
-    routing::{get, post},
-    Json, Router,
-};
-use crypto_crawler::{MarketType, Message};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
 
-use chrono::{Duration, TimeZone, Utc};
-use crypto_msg_parser::parse_l2_topk;
+use axum::body::StreamBody;
+use axum::extract::ws::{Message as RawMessage, WebSocket, WebSocketUpgrade};
+use axum::extract::{Extension, TypedHeader};
+use axum::http::{header, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use crypto_crawler::Message;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_json::Value;
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{mpsc::Receiver, Arc},
-};
-use std::{ops::Add, sync::Mutex};
-use axum::http::HeaderValue;
+use serde_json::{json, Value};
 use tokio_util::io::ReaderStream;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
-use websocket::{config::config::ApplicationConfig, init_config};
+use websocket::config::ApplicationConfig;
+use websocket::init_config;
 // use wmjtyd_libstock::file::reader::FileReader;
 // use wmjtyd_libstock::data::bbo::decode_bbo;
-
 use wmjtyd_libstock::file::reader::FileReader;
-use wmjtyd_libstock::data::bbo::BboStructure;
-use wmjtyd_libstock::data::kline::KlineStructure;
-use wmjtyd_libstock::data::serializer::StructDeserializer;
 
 #[tokio::main]
 async fn main() {
@@ -86,7 +73,7 @@ async fn handle_socket(
             if let Ok(msg) = msg {
                 match msg {
                     RawMessage::Text(t) => {
-                        let actions = processing_requests(&t, &state,&mut socket).await;
+                        let actions = processing_requests(&t, &state, &mut socket).await;
                         socket.send(RawMessage::Text(actions)).await.unwrap();
                     }
                     RawMessage::Binary(_) => {
@@ -152,12 +139,18 @@ pub async fn handler(
     // ]);
     // let header= Response::headers();
     let mut headers: Response<()> = Response::default();
-    headers.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("text/toml; charset=utf-8"));
-    headers.headers_mut().insert(header::CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=\"data\""));
+    headers.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/toml; charset=utf-8"),
+    );
+    headers.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("attachment; filename=\"data\""),
+    );
     Ok((headers, body))
 }
 
-pub fn filename(params: &Params) -> String{
+pub fn filename(params: &Params) -> String {
     // let mut files = Vec::new();
     let exchange = &params.exchange;
     let market_type = &params.market_type;
@@ -169,17 +162,26 @@ pub fn filename(params: &Params) -> String{
     // let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
     // let end_datetime = Utc.timestamp(params.end_datetime, 0);
     // let days = (end_datetime - begin_datetime).num_days();
-    let fileName = if let Some(period) = &params.period {
+
+    if let Some(period) = &params.period {
         if period.is_empty() {
-            format!("/{}/{}_{}_{}_{}",date,exchange, market_type, msg_type, symbol)
-        }else {
-            format!("/{}/{}_{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol,period)
+            format!(
+                "/{}/{}_{}_{}_{}",
+                date, exchange, market_type, msg_type, symbol
+            )
+        } else {
+            format!(
+                "/{}/{}_{}_{}_{}_{}",
+                date, exchange, market_type, msg_type, symbol, period
+            )
         }
         // format!("/{}/{}_{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol,period)
     } else {
-        format!("/{}/{}_{}_{}_{}",date,exchange, market_type, msg_type, symbol)
-    };
-    fileName
+        format!(
+            "/{}/{}_{}_{}_{}",
+            date, exchange, market_type, msg_type, symbol
+        )
+    }
     // let mut datetime = format!("{}", begin_datetime.format("%Y%m%d"));
     //循环
     // for _i in 0..days {
@@ -198,30 +200,31 @@ pub fn filename(params: &Params) -> String{
     // }
     // files
 }
-pub fn fileNamePartData(params: &Params) -> String{
+pub fn file_name_part_data(params: &Params) -> String {
     // let mut files = Vec::new();
     let exchange = &params.exchange;
     let market_type = &params.market_type;
     let msg_type = &params.msg_type;
     let symbol = &params.symbols;
-    let date = &params.date;
+    let _date = &params.date;
     // date+ "/" + exchange+market_type+msg_type+symbol
     // format!("{}/{}_{}_{}_{}", date,exchange, market_type, msg_type, symbol);
     // let mut begin_datetime = Utc.timestamp(params.begin_datetime, 0);
     // let end_datetime = Utc.timestamp(params.end_datetime, 0);
     // let days = (end_datetime - begin_datetime).num_days();
-    let fileName = if let Some(period) = &params.period {
+
+    if let Some(period) = &params.period {
         if period.is_empty() {
-            format!("{}_{}_{}_{}",exchange, market_type, msg_type, symbol)
-        }else {
-            format!("{}_{}_{}_{}_{}",exchange, market_type, msg_type, symbol,period)
+            format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
+        } else {
+            format!(
+                "{}_{}_{}_{}_{}",
+                exchange, market_type, msg_type, symbol, period
+            )
         }
-
     } else {
-        format!("{}_{}_{}_{}",exchange, market_type, msg_type, symbol)
-    };
-    fileName
-
+        format!("{}_{}_{}_{}", exchange, market_type, msg_type, symbol)
+    }
 }
 
 #[derive(Deserialize)]
@@ -233,8 +236,8 @@ pub struct Params {
     pub period: Option<String>,
     // pub begin_datetime: i64,
     // pub end_datetime: i64,
-    pub date:String,
-    pub day:Option<i64>
+    pub date: String,
+    pub day: Option<i64>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct Action {
@@ -248,23 +251,22 @@ pub struct AppState {
     pub receiver: Arc<Mutex<HashMap<i64, Receiver<Message>>>>,
 }
 pub async fn processing_requests(str: &str, state: &AppState, socket: &mut WebSocket) -> String {
-    println!("{}",str);
+    println!("{}", str);
     let params: Action = serde_json::from_str(str).unwrap();
-    if let Some(echo) = params.echo {
-        let result = String::new();
-        let param:Params= serde_json::from_str(&params.params.to_string()).unwrap();
-        let fileName = fileNamePartData(&param);
-        let day = if let Some(day) = param.day {
-             day
-        }else{
-             0
-        };
+    if let Some(_echo) = params.echo {
+        let _result = String::new();
+        let param: Params = serde_json::from_str(&params.params.to_string()).unwrap();
+        let file_name = file_name_part_data(&param);
+        let day = if let Some(day) = param.day { day } else { 0 };
         //0是单天 1是昨天 2 前天 - 8
-        let r = FileReader::new(fileName, day);
+        let r = FileReader::new(file_name, day);
 
         for i in r.unwrap() {
             println!("{:?}", i);
-            socket.send(RawMessage::Text(json!(i).to_string())).await.unwrap();
+            socket
+                .send(RawMessage::Text(json!(i).to_string()))
+                .await
+                .unwrap();
             // socket.
         }
         // let receiver = state.receiver.clone();
@@ -275,23 +277,22 @@ pub async fn processing_requests(str: &str, state: &AppState, socket: &mut WebSo
         //     println!("{:?}", i);
         // }
 
-            // let locked = receiver.lock();
-            // println!("{:?}",locked);
-            // let xx = locked.unwrap();
-            // println!("{:?}",xx);
-            // let receiver = xx.get(&echo).unwrap();
-            // println!("22{:?}",receiver);
-            // for msg in receiver {
-            //     let msg: Message = msg;
-            //     println!("1111{}",msg);
-            //     let received_at = msg.received_at as i64;
-            //
-            //
-            //     // let orderbook = &orderbook[0];
-            //     // result.clone().push_str(&json!(orderbook).to_string());
-            //     // break;
-            // }
-
+        // let locked = receiver.lock();
+        // println!("{:?}",locked);
+        // let xx = locked.unwrap();
+        // println!("{:?}",xx);
+        // let receiver = xx.get(&echo).unwrap();
+        // println!("22{:?}",receiver);
+        // for msg in receiver {
+        //     let msg: Message = msg;
+        //     println!("1111{}",msg);
+        //     let received_at = msg.received_at as i64;
+        //
+        //
+        //     // let orderbook = &orderbook[0];
+        //     // result.clone().push_str(&json!(orderbook).to_string());
+        //     // break;
+        // }
     } else {
         if params.action == "subscribe" {
             // let mut receiver = state.receiver.lock().unwrap();
@@ -309,5 +310,5 @@ pub async fn processing_requests(str: &str, state: &AppState, socket: &mut WebSo
         }
     }
 
-    return "".to_string();
+    "".to_string()
 }

@@ -1,13 +1,10 @@
 extern crate log;
 
-use std::{
-    net::{SocketAddr},
-    sync::{mpsc::{channel, Receiver, Sender}},
-};
+use std::net::{SocketAddr};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use quiche::Config;
 use ring::rand::*;
-
 
 // const MAX_DATAGRAM_SIZE: usize = 1350;
 
@@ -15,9 +12,9 @@ const HTTP_REQ_STREAM_ID: u64 = 4;
 
 pub fn client(
     addr: SocketAddr,
-    mut config: Config, 
-    subscribe_list: Vec<String>, 
-    tx: Sender<Vec<u8>>
+    mut config: Config,
+    subscribe_list: Vec<String>,
+    tx: Sender<Vec<u8>>,
 ) {
     let mut buf = [0; 65535];
     let mut out = [0; 1350];
@@ -152,7 +149,7 @@ pub fn client(
             debug!("sending sub {:?}", subscribe_list);
             let mut data = Vec::new();
             for sub in &subscribe_list {
-                data.extend_from_slice(&format!("sub@{};", sub).as_bytes());
+                data.extend_from_slice(format!("sub@{};", sub).as_bytes());
             }
 
             debug!("{:?}", String::from_utf8(data[..data.len() - 1].to_vec()));
@@ -172,7 +169,6 @@ pub fn client(
                 let stream_buf = &buf[..read];
 
                 debug!("stream {} has {} bytes (fin? {})", s, stream_buf.len(), fin);
-
 
                 tx.send(stream_buf.to_vec()).expect("send error");
 
@@ -226,12 +222,7 @@ pub fn client(
     }
 }
 
-
-pub fn create_client(
-    addr: SocketAddr,
-    config: Config, 
-    ipc: String, 
-) -> Receiver<Vec<u8>> {
+pub fn create_client(addr: SocketAddr, config: Config, ipc: String) -> Receiver<Vec<u8>> {
     let (tx, rx) = channel();
     let subscribe_list = vec![ipc];
     tokio::task::spawn(async move {

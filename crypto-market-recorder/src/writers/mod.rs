@@ -2,16 +2,11 @@
 
 use concat_string::concat_string;
 use tracing::error;
-
-use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
-
 // pub use file_writer::FileWriter;
 pub use wmjtyd_libstock::file::writer::DataWriter;
-
-
+use wmjtyd_libstock::file::writer::{DataEntry, WriteError};
+use wmjtyd_libstock::message::traits::{Connect, StreamExt, Subscribe};
 use wmjtyd_libstock::message::zeromq::ZeromqSubscriber;
-use wmjtyd_libstock::message::traits::{Subscribe, Connect, StreamExt};
-
 
 pub trait Writer {
     fn write(&mut self, s: &str);
@@ -31,44 +26,48 @@ pub async fn create_write_file_thread(
         let mut data_writer = DataWriter::new();
         data_writer.start().await?;
 
-
         let mut subscriber = ZeromqSubscriber::new().expect("init error!");
-        if subscriber.connect(&ipc_exchange_market_type_msg_type).is_err()
-        || subscriber.subscribe(b"").is_err() {
+        if subscriber
+            .connect(&ipc_exchange_market_type_msg_type)
+            .is_err()
+            || subscriber.subscribe(b"").is_err()
+        {
             // 这里有问题
             return Ok(());
         }
 
-        tokio::task::spawn( async move { loop {
-            // 数据 payload
-            tracing::debug!("start");
-            let message = StreamExt::next(&mut subscriber).await;
-            if message.is_none() {
-                break;
-            }
+        tokio::task::spawn(async move {
+            loop {
+                // 数据 payload
+                tracing::debug!("start");
+                let message = StreamExt::next(&mut subscriber).await;
+                if message.is_none() {
+                    break;
+                }
 
-            tracing::debug!("yes");
+                tracing::debug!("yes");
 
-            match message.unwrap() {
-                Ok(message) => {
-                    tracing::debug!("{:?}", message);
-                    let result = data_writer.add(DataEntry {
-                        filename: ipc.to_string(),
-                        data: message,
-                    });
+                match message.unwrap() {
+                    Ok(message) => {
+                        tracing::debug!("{:?}", message);
+                        let result = data_writer.add(DataEntry {
+                            filename: ipc.to_string(),
+                            data: message,
+                        });
 
-                    if let Err(e) = result {
-                        error!("Failed to add data: {e}");
+                        if let Err(e) = result {
+                            error!("Failed to add data: {e}");
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        error!("Client failed to receive payload: {err}");
                         break;
                     }
                 }
-                Err(err) => {
-                    error!("Client failed to receive payload: {err}");
-                    break;
-                }
             }
-        }}).await?;
-
+        })
+        .await?;
 
         Ok::<(), RecorderWriterError>(())
     };

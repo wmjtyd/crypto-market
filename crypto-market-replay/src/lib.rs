@@ -1,6 +1,6 @@
 use tokio::fs::read_to_string;
 
-use crate::config::config::ApplicationConfig;
+use crate::config::ApplicationConfig;
 
 pub mod config;
 

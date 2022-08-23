@@ -1,10 +1,11 @@
 use std::sync::mpsc::Sender;
 
-use super::utils::create_conversion_thread;
 use crypto_crawler::Message;
 use crypto_market_type::MarketType;
 use crypto_msg_type::MessageType;
 use crypto_ws_client::*;
+
+use super::utils::create_conversion_thread;
 
 pub(super) async fn crawl_other(market_type: MarketType, tx: Sender<Message>) {
     let tx = create_conversion_thread("binance".to_string(), MessageType::Other, market_type, tx);

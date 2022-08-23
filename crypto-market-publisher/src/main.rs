@@ -2,13 +2,10 @@
 mod client;
 mod server;
 
-
 use std::net::SocketAddr;
 
 use clap::{clap_app, ArgMatches};
-
 use server::create_server;
-
 
 #[macro_use]
 extern crate lazy_static;
@@ -44,8 +41,8 @@ fn start_server(m: &ArgMatches) {
 
     debug!("{} {}", crt, key);
 
-    config.load_cert_chain_from_pem_file(&crt).unwrap();
-    config.load_priv_key_from_pem_file(&key).unwrap();
+    config.load_cert_chain_from_pem_file(crt).unwrap();
+    config.load_priv_key_from_pem_file(key).unwrap();
 
     config
         .set_application_protos(b"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9")
@@ -103,7 +100,6 @@ fn start_client(m: &ArgMatches) {
     config.set_initial_max_streams_bidi(100);
     config.set_initial_max_streams_uni(100);
     config.set_disable_active_migration(true);
-
 
     let rx = client::create_client(addr, config, ipc);
     for i in rx.iter() {
