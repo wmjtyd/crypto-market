@@ -7,13 +7,13 @@ edition = "2021"
 [dependencies]
 clap = "~2.27.1"
 env_logger = "0.4.3"
-lazy_static = "1"
-log = { version = "0.4", features = ["std"] }
-mio = { version = "0.8", features = ["net", "os-poll"] }
+lazy_static = "1.4.0"
+log = { version = "0.4.17", features = ["std"] }
+mio = { version = "0.8.4", features = ["net", "os-poll"] }
 quiche = "0.14.0"
-ring = "0.16"
+ring = "0.16.20"
 tokio = { version = "1.20.1", features = ["rt-multi-thread",  "time", "sync", "macros"] }
-url = "2"
+url = "2.2.2"
 
 [dependencies.wmjtyd-libstock]
 git = "https://github.com/wmjtyd/libstock.git"
