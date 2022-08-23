@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use crypto_crawler::{Message, MarketType, MessageType};
+use crypto_crawler::{MarketType, Message, MessageType};
 use crypto_ws_client::{CoinbaseProWSClient, WSClient};
 
 use super::utils::create_conversion_thread;

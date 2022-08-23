@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use crypto_crawler::{Message, MessageType, MarketType};
+use crypto_crawler::{MarketType, Message, MessageType};
 
 // create a thread to convert Sender<Arc<Message>> Sender<String>
 pub(super) fn create_conversion_thread(

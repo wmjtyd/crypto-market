@@ -154,7 +154,9 @@ async fn create_writer_thread(
                 MessageType::Candlestick => {
                     let kline_msg = tokio::task::spawn_blocking(move || {
                         // FIXME: candlestick returns multiple results!
-                        parse_candlestick(exchange, market_type, &msg_r.json).unwrap().swap_remove(0)
+                        parse_candlestick(exchange, market_type, &msg_r.json)
+                            .unwrap()
+                            .swap_remove(0)
                     })
                     .await
                     .unwrap();

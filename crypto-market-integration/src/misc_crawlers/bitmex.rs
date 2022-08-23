@@ -1,7 +1,7 @@
 use std::sync::mpsc::Sender;
 
-use crypto_ws_client::{WSClient, BitmexWSClient};
-use crypto_crawler::{Message, MarketType, MessageType};
+use crypto_crawler::{MarketType, Message, MessageType};
+use crypto_ws_client::{BitmexWSClient, WSClient};
 
 use super::utils::create_conversion_thread;
 
