@@ -2,27 +2,26 @@
 name = "websocket"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum =  {version = "0.5.15", features = ["headers","ws"] }
-tokio = { version = "1.20", features = ["full"] }
-tracing = "0.1"
-tracing-subscriber = { version="0.3", features = ["env-filter"] }
-tower-http = { version = "0.3.4", features = ["fs", "trace"] }
-headers = "0.3"
+axum =  { version = "0.5.15", features = ["headers","ws"] }
 chrono = "0.4.21"
-rust_decimal = "1.26.1"
-tokio-util = "0.7.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.83"
-serde_derive = "1.0.143"
-rand = "0.8.5"
-futures = "0.3.21"
-toml = "0.5.9"
 crypto-crawler = "4.5.13"
 crypto-msg-parser = "2.7.3"
+futures = "0.3.21"
+headers = "0.3"
+rand = "0.8.5"
+rust_decimal = "1.26.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0.143"
+serde_json = "1.0.83"
+tokio = { version = "1.20", features = ["full"] }
+tokio-util = "0.7.3"
+toml = "0.5.9"
+tower-http = { version = "0.3.4", features = ["fs", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dependencies.wmjtyd-libstock]
 git = "https://github.com/wmjtyd/libstock.git"
