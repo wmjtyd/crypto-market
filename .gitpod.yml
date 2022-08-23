@@ -10,7 +10,6 @@ tasks:
       cargo -V
     init: |
       cargo clippy
-      cargo build
 
 vscode:
   extensions:
