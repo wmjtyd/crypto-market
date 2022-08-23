@@ -24,11 +24,9 @@ phf = { version = "0.11.1", features = ["macros"] }
 futures = "0.3.21"
 
 clap = "~2.27.1"
-crypto-crawler = "4.5.13"
-crypto-market-type = "1.1.3"
-crypto-msg-type = "1.0.10"
-crypto-msg-parser = "2.7.3"
 crypto-ws-client = "4.11.10"
+crypto-crawler = "4.5.13"
+crypto-msg-parser = "2.7.3"
 
 [dependencies.wmjtyd-libstock]
 git = "https://github.com/wmjtyd/libstock.git"

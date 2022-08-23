@@ -1,9 +1,7 @@
 use std::sync::mpsc::Sender;
 
-use crypto_crawler::Message;
-use crypto_market_type::MarketType;
-use crypto_msg_type::MessageType;
-use crypto_ws_client::*;
+use crypto_ws_client::{WSClient, HuobiSpotWSClient};
+use crypto_crawler::{Message, MarketType, MessageType};
 
 use super::utils::create_conversion_thread;
 

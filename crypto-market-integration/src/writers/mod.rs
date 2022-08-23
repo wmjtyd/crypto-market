@@ -68,6 +68,7 @@ async fn create_writer_thread(
                 MessageType::BBO => {
                     let received_at = msg_r.received_at;
                     let bbo_msg = tokio::task::spawn_blocking(move || {
+                        // FIXME: bbo returns multiple results!
                         parse_bbo(
                             exchange,
                             MarketType::Spot,
@@ -75,6 +76,7 @@ async fn create_writer_thread(
                             Some(received_at as i64),
                         )
                         .unwrap()
+                        .swap_remove(0)
                     })
                     .await
                     .unwrap();
@@ -151,7 +153,8 @@ async fn create_writer_thread(
                 }
                 MessageType::Candlestick => {
                     let kline_msg = tokio::task::spawn_blocking(move || {
-                        parse_candlestick(exchange, market_type, &msg_r.json, msg_type).unwrap()
+                        // FIXME: candlestick returns multiple results!
+                        parse_candlestick(exchange, market_type, &msg_r.json).unwrap().swap_remove(0)
                     })
                     .await
                     .unwrap();
