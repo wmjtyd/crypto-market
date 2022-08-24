@@ -2,36 +2,26 @@
 name = "websocket"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum =  {version = "0.5.15", features = ["headers","ws"] }
-tokio = { version = "1.20", features = ["full"] }
-tracing = "0.1"
-tracing-subscriber = { version="0.3", features = ["env-filter"] }
-tower-http = { version = "0.3.4", features = ["fs", "trace"] }
-headers = "0.3"
-# crypto-markets = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-# crypto-market-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-# crypto-msg-type = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-# crypto-pair = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-# crypto-rest-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-# crypto-ws-client = { git = "https://github.com/wmjtyd/crypto-crawler-rs" }
-chrono = "0.4.21"
-rust_decimal = "1.26.1"
-rust_decimal_macros = "1.26.1"
-tokio-util = "0.7.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.83"
-serde_derive = "1.0.143"
+axum =  { version = "0.5.15", features = ["headers","ws"] }
+chrono = "0.4.22"
+crypto-crawler = "4.5.13"
+crypto-msg-parser = "2.7.3"
+futures = "0.3.23"
+headers = "0.3.7"
 rand = "0.8.5"
-futures = "0.3.21"
+rust_decimal = "1.26.1"
+serde = { version = "1.0.144", features = ["derive"] }
+serde_derive = "1.0.144"
+serde_json = "1.0.85"
+tokio = { version = "1.20.1", features = ["full"] }
+tokio-util = "0.7.3"
 toml = "0.5.9"
-
-[dependencies.crypto-crawler]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
+tower-http = { version = "0.3.4", features = ["fs", "trace"] }
+tracing = "0.1.36"
+tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 
 [dependencies.wmjtyd-libstock]
 git = "https://github.com/wmjtyd/libstock.git"
@@ -39,6 +29,3 @@ default-features = false
 features = ["crypto", "zeromq", "slack"]
 branch = "develop"
 
-[dependencies.crypto-msg-parser]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "d41482af5fc33797ee12c54da809b660850d2ab2"

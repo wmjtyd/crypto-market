@@ -3,51 +3,23 @@ name = "crypto-market-integration"
 version = "2.11.2"
 authors = ["soulmachine <soulmachine@gmail.com>"]
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-redis = "0.21.5"
-reopen = { version = "1.0.3", features = ["signals"] }
-serde_json = "1.0.83"
-signal-hook = { version = "0.3.14", features = ["extended-siginfo"] }
-log = "0.4.17"
-env_logger = "0.9.0"
-tokio = { version = "1.20.1", features = ["rt-multi-thread", "macros"] }
-lazy_static = "1.4.0"
-slack-hook = "0.8.0"
-openssl = { version = "0.10", features = ["vendored"] }
-chrono = "0.4.21"
-rust_decimal = "1.26.1"
-rust_decimal_macros = "1.26.1"
-phf = { version = "0.11.1", features = ["macros"] }
-futures = "0.3.21"
+chrono = "0.4.22"
 
 clap = "~2.27.1"
-
-
-[dependencies.crypto-crawler]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
-
-
-[dependencies.crypto-market-type]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "9c7cda9ab90c900c014566f9d279bef822cc37f1"
-
-
-[dependencies.crypto-msg-type]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "9c7cda9ab90c900c014566f9d279bef822cc37f1"
-
-[dependencies.crypto-msg-parser]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
-
-[dependencies.crypto-ws-client]
-git = "https://github.com/wmjtyd/crypto-crawler-rs"
-rev = "d41482af5fc33797ee12c54da809b660850d2ab2"
-
+crypto-crawler = "4.5.13"
+crypto-msg-parser = "2.7.3"
+crypto-ws-client = "4.11.10"
+env_logger = "0.9.0"
+futures = "0.3.23"
+lazy_static = "1.4.0"
+log = "0.4.17"
+rust_decimal = "1.26.1"
+serde_json = "1.0.85"
+slack-hook = "0.8.0"
+tokio = { version = "1.20.1", features = ["rt-multi-thread", "macros"] }
 
 [dependencies.wmjtyd-libstock]
 git = "https://github.com/wmjtyd/libstock.git"

@@ -1,9 +1,7 @@
 use std::sync::mpsc::Sender;
 
-use crypto_crawler::Message;
-use crypto_market_type::MarketType;
-use crypto_msg_type::MessageType;
-use crypto_ws_client::*;
+use crypto_crawler::{MarketType, Message, MessageType};
+use crypto_ws_client::{BinanceInverseWSClient, BinanceLinearWSClient, WSClient};
 
 use super::utils::create_conversion_thread;
 
