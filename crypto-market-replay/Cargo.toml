@@ -1,5 +1,5 @@
 [package]
-name = "websocket"
+name = "crypto-market-replay"
 version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -22,6 +22,11 @@ toml = "0.5.9"
 tower-http = { version = "0.3.4", features = ["fs", "trace"] }
 tracing = "0.1.36"
 tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
+anyhow = { version = "1.0.58", features = ["backtrace"] }
+notify = "5.0.0-pre.15"
+arcstr = { version = "1.1.4", features = ["serde"] }
+base64 = "0.12.1"
+clap = "~2.27.0"
 
 [dependencies.wmjtyd-libstock]
 git = "https://github.com/wmjtyd/libstock.git"
