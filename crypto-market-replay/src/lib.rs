@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use futures::StreamExt;
 use parameter_type::SocketAction;
+use serde_json::json;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::Sender;
 use wmjtyd_libstock::message::traits::{Connect, Subscribe};
@@ -16,35 +17,37 @@ use parameter_type::{ReceiverAction, TxJSON};
 mod market_data_file;
 pub use market_data_file::http_market_data;
 
-pub async fn msg_sub_handle(mut receiver_action: ReceiverAction) {
-    // 基础路径
-    const IPC_CONFIG_PATH: &str = "./conf/ipc.json";
-
+pub async fn msg_sub_handle(config_path: String, mut receiver_action: ReceiverAction) {
     // 当前运行时环境
     let handle = Handle::current();
 
     // 传输订阅数据
-    let (data_tx, mut data_rx) = tokio::sync::mpsc::channel::<(String, Vec<u8>)>(1024);
+    let (data_tx, mut data_rx) = tokio::sync::mpsc::channel::<(String, String,Vec<u8>)>(1024);
 
     // 配置文件更新时
     let _watcher = DynamicConfigHandler::new(
-        IPC_CONFIG_PATH,
+        &config_path,
         handle,
         Box::new(move |handle, market_data_arg| {
             let data_tx = data_tx.clone();
 
-            let url = format!("ipc:///tmp/{}.ipc", market_data_arg.to_string());
+            let symbol = market_data_arg.to_string();
+
+            let path = format!("ipc:///tmp/{}.ipc", symbol);
+
+            tracing::debug!("path {path}");
 
             handle.spawn(async move {
                 let mut sub = ZeromqSubscriber::new().expect("sub init error");
-                if sub.connect(&url).is_err() || sub.subscribe(b"").is_err() {
+                if sub.connect(&path).is_err() || sub.subscribe(b"").is_err() {
                     tracing::error!("sub connect");
                     return;
                 }
 
                 while let Some(Ok(data)) = StreamExt::next(&mut sub).await {
+                    tracing::debug!("get data {path}");
                     if data_tx
-                        .send((market_data_arg.msg_type.to_owned(), data))
+                        .send((symbol.to_owned(), market_data_arg.msg_type.to_owned(), data))
                         .await
                         .is_err()
                     {
@@ -74,8 +77,8 @@ pub async fn msg_sub_handle(mut receiver_action: ReceiverAction) {
             }
             // 推送数据
             data = data_rx.recv() =>{
-                if let Some((symbol, data)) = data {
-                    let _ = data_hander(symbol, data, &mut sub_list).await;
+                if let Some((symbol, msg_type, data)) = data {
+                    let _ = data_hander(symbol, msg_type, data, &mut sub_list).await;
                     continue;
                 }
             }
@@ -91,6 +94,7 @@ async fn action_handle(
     user_list: &mut HashMap<usize, (TxJSON, HashSet<String>)>,
     sub_list: &mut HashMap<String, HashMap<usize, TxJSON>>,
 ) -> Option<()> {
+    tracing::debug!("sub_list {:?}", sub_list);
     let state = match action {
         // 订阅处理
         SocketAction::Subscribe(signal_name, tx_json) => {
@@ -102,7 +106,7 @@ async fn action_handle(
             action_handle_unsubscribe(id, signal_name, user_list, sub_list).is_some()
         }
     };
-    let (tx_json, _) = user_list.get(&id)?;
+    let (tx_json, _) = user_list.get_mut(&id)?;
 
     // 响应
     if state {
@@ -123,18 +127,17 @@ fn action_handle_subscribe(
     sub_list: &mut HashMap<String, HashMap<usize, TxJSON>>,
 ) -> Option<()> {
     tracing::debug!("{:?}", user_list);
-    let user_session = sub_list.get_mut(symbol)?;
     if let Some((_, user_info)) = user_list.get_mut(&id) {
         if !user_info.contains(symbol) {
             return None;
         }
         user_info.insert(symbol.to_owned());
-        user_session.insert(id.to_owned(), tx_json.clone());
     } else {
         let market_data_list = HashSet::from([symbol.to_owned()]);
         let _ = user_list.insert(id, (tx_json.clone(), market_data_list));
-        let _ = user_session.insert(id, tx_json.clone());
     }
+    let user_session = sub_list.get_mut(symbol)?;
+    let _ = user_session.insert(id, tx_json.clone());
     Some(())
 }
 fn action_handle_unsubscribe(
@@ -160,16 +163,22 @@ fn action_handle_unsubscribe(
 
 pub async fn data_hander(
     symbol: String,
+    msg_type: String,
     data: Vec<u8>,
     sub_list: &mut HashMap<String, HashMap<usize, TxJSON>>,
 ) -> anyhow::Result<()> {
     let data_base64 = base64::encode(data);
 
+    let json = json!({
+        "messageType": msg_type,
+        "payload": data_base64
+    }).to_string();
+
     tracing::debug!("{:?}", sub_list);
 
     if let Some(session_list) = sub_list.get_mut(&symbol) {
         for (_, tx_json) in session_list.iter_mut() {
-            let _ = tx_json.send(data_base64.to_owned()).await;
+            let _ = tx_json.send(json.to_owned()).await;
         }
         return Ok(());
     } else {

@@ -13,7 +13,7 @@ use crate::parameter_type::MarketDataArg;
 
 pub type SubTaskCreator = dyn Fn(Handle, MarketDataArg) -> JoinHandle<()> + Send + Sync;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct ConfigStructure {
     pub ipcs: Vec<MarketDataArg>,
 }
@@ -39,6 +39,7 @@ impl DynamicConfigHandler {
             to_task,
             all_sub_task: HashMap::with_capacity(5),
         };
+        println!("config_path {}", config_path);
         config.on_config_update().expect("init config error");
         config
     }
@@ -64,6 +65,8 @@ impl DynamicConfigHandler {
         let content = std::fs::read_to_string(&self.config_path)?;
         let config: ConfigStructure = serde_json::from_str(&content)
             .context("failed to deserialize the configuration file")?;
+        
+        tracing::debug!("config {:?}", config);
 
         let all_sub_task: HashSet<MarketDataArg> =
             self.all_sub_task.keys().map(|m| m.clone()).collect();

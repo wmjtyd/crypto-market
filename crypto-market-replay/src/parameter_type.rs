@@ -32,7 +32,7 @@ pub struct Action {
     pub args: Vec<MarketDataArg>,
 }
 
-#[derive(Deserialize, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Deserialize, Hash, PartialEq, Eq, Clone)]
 pub struct MarketDataArg {
     pub exchange: String,
     #[serde(rename = "marketType")]

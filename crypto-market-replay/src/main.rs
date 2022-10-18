@@ -20,6 +20,7 @@ async fn main() {
         (@arg LOG: --log "log log save directory 'logs/'")
         (@arg LEVEL: --level "log show level")
         (@arg DATA: --data "market data base directory")
+        (@arg CNOFIG: --config "configapption path")
     )
     .get_matches();
 
@@ -34,7 +35,9 @@ async fn main() {
 
     let addr = application_config.server.get_addr();
 
-    tokio::spawn(msg_sub_handle(rx));
+    let config_path = matches.value_of("CONFIG").unwrap_or("./conf.json").to_string();
+
+    tokio::spawn(msg_sub_handle(config_path, rx));
 
     let app = Router::new()
         // http

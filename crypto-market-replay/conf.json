@@ -1,0 +1,10 @@
+{
+    "ipcs": [
+        {
+            "exchange": "binance",
+            "marketType": "linear_swap",
+            "symbol": "BTCUSDT",
+            "messageType": "funding_rate"
+        }
+    ]
+}
