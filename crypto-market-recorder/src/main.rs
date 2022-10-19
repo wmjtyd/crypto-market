@@ -4,8 +4,7 @@ use crypto_market_recorder::create_write_file_thread;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    env_logger::init();
-
+    tracing_subscriber::fmt::init();
     let matches: clap::ArgMatches = clap_app!(quic =>
             (about: "use save file")
             (@arg EXCHANGE:     +required "exchange")
@@ -21,21 +20,12 @@ async fn main() {
     let msg_type = matches.value_of("MSG_TYPE").unwrap();
     let symbol = matches.value_of("SYMBOL").unwrap();
 
-    let ipc = if let Some(period) = matches.value_of("PERIOD") {
-        concat_string!(
-            exchange,
-            "_",
-            market_type,
-            "_",
-            msg_type,
-            "_",
-            symbol,
-            "_",
-            period
-        )
+    let period = if let Some(period) = matches.value_of("PERIOD") {
+        concat_string!("_", period)
     } else {
-        concat_string!(exchange, "_", market_type, "_", msg_type, "_", symbol)
+        "".to_string()
     };
+    let ipc = concat_string!( exchange, "_", market_type, "_", msg_type, "_", symbol, period);
 
     create_write_file_thread(exchange, market_type, msg_type, ipc.to_string())
         .await

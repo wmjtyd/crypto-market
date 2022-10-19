@@ -22,6 +22,8 @@ pub async fn create_write_file_thread(
     // concat_string for better performance
     let ipc_exchange_market_type_msg_type = concat_string!("ipc:///tmp/", ipc, ".ipc");
 
+    tracing::debug!("{}", ipc_exchange_market_type_msg_type);
+
     let task = async move {
         let mut data_writer = DataWriter::new();
         data_writer.start().await?;
@@ -36,16 +38,18 @@ pub async fn create_write_file_thread(
             return Ok(());
         }
 
+        tracing::info!("start read data");
+
         tokio::task::spawn(async move {
             loop {
+                tracing::debug!("await data");
                 // 数据 payload
-                tracing::debug!("start");
                 let message = StreamExt::next(&mut subscriber).await;
+
+
                 if message.is_none() {
                     break;
                 }
-
-                tracing::debug!("yes");
 
                 match message.unwrap() {
                     Ok(message) => {
@@ -66,6 +70,7 @@ pub async fn create_write_file_thread(
                     }
                 }
             }
+            tracing::info!("stop read");
         })
         .await?;
 
