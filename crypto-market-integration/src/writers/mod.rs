@@ -154,26 +154,25 @@ async fn create_writer_thread(
                 MessageType::Candlestick => {
                     let kline_msg = tokio::task::spawn_blocking(move || {
                         // FIXME: candlestick returns multiple results!
-                        parse_candlestick(exchange, market_type, &msg_r.json)
-                            .unwrap()
-                            .swap_remove(0)
+                        parse_candlestick(exchange, market_type, &msg_r.json, None).unwrap()
                     })
                     .await
                     .unwrap();
 
-                    let symbol = kline_msg.symbol.to_owned();
+                    for kline in kline_msg {
+                        let symbol = kline.symbol.to_owned();
 
-                    if let Ok(kline_structure) = KlineStructure::try_from(&kline_msg) {
+                        if let Ok(order_book_structure) = KlineStructure::try_from(&kline) {
                         let mut byte_data = Vec::new();
-                        if kline_structure.serialize(&mut byte_data).is_err() {
+                            if order_book_structure.serialize(&mut byte_data).is_err() {
                             continue;
                         }
                         data_vec.push((symbol, byte_data));
                     };
                 }
+                }
                 MessageType::FundingRate => {
                     let funding_rate_msg = tokio::task::spawn_blocking(move || {
-                        println!("{}", msg_r.json);
                         parse_funding_rate(exchange, market_type, &msg_r.json, Some(1232))
                     })
                     .await
@@ -202,22 +201,19 @@ async fn create_writer_thread(
 
             // Send a message to the corresponding message queue
             for (symbol, data_byte) in data_vec {
-                let key = if period.len() != 0 {
-                    format!(
-                        "{}_{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, symbol, period
-                    )
-                } else {
-                    format!(
-                        "{}_{}_{}_{}",
-                        msg.exchange, msg.market_type, msg.msg_type, symbol
-                    )
-                };
-                debug!("{}", key);
+                let key = format!(
+                    "{}_{}_{}_{}{}{}",
+                    msg.exchange, 
+                    msg.market_type, 
+                    msg.msg_type, 
+                    symbol, 
+                    if period.len() == 0 {""} else {"_"},
+                    period
+                );
                 let writer_mq = if writers.contains_key(&key) {
                     writers.get_mut(&key).unwrap()
                 } else {
-                    println!("{key}");
+                    debug!("{key}");
                     let socket = create(&key).await;
                     writers.insert(key.to_owned(), socket);
                     writers.get_mut(&key).unwrap()
