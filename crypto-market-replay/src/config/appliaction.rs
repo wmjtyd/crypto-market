@@ -37,7 +37,7 @@ impl ApplicationConfig {
         
         let log_dir = config.value_of("LOG").unwrap_or("logs").to_string();
         let log_level = config.value_of("LEVEL").unwrap_or("info").to_string();
-        let market_data_dir = config.value_of("DATA").unwrap_or("./").to_string();
+        let market_data_dir = config.value_of("DATA").unwrap_or("./record").to_string();
 
         Self { log_dir, log_level, server, market_data_dir}
     }

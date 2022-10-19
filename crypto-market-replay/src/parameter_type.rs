@@ -19,9 +19,11 @@ pub enum SocketAction {
 #[derive(Deserialize)]
 pub struct Params {
     pub exchange: String,
+    #[serde(rename = "marketType")]
     pub market_type: String,
+    #[serde(rename = "messageType")]
     pub msg_type: String,
-    pub symbols: String,
+    pub symbol: String,
     pub period: Option<String>,
     pub elapse: Option<i64>,
 }

@@ -48,7 +48,7 @@ pub fn market_data_path(base_path: &str, params: &Params) -> String {
     let exchange = &params.exchange;
     let market_type = &params.market_type;
     let msg_type = &params.msg_type;
-    let symbol = &params.symbols;
+    let symbol = &params.symbol;
 
     let mut period = String::new();
 
